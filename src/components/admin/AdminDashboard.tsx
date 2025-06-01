@@ -20,6 +20,13 @@ interface Category {
   updated_at: string;
 }
 
+interface VideoCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  thumbnail: string | null;
+}
+
 interface Video {
   id: string;
   title: string;
@@ -31,7 +38,7 @@ interface Video {
   views: number | null;
   created_at: string;
   updated_at: string;
-  categories?: Category;
+  categories?: VideoCategory;
 }
 
 const AdminDashboard = () => {
