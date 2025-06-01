@@ -17,25 +17,56 @@ const AdminAuth = ({ onAuthSuccess }: AdminAuthProps) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const ADMIN_EMAIL = 'la.observation.digital@gmail.com';
+  const ADMIN_PASSWORD = 'ayoub1994??%%';
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      // First, authenticate with Supabase
+      // First validate against the specific credentials
+      if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+        throw new Error('بيانات الدخول غير صحيحة - غير مصرح لك بالوصول');
+      }
+
+      // Then authenticate with Supabase using the correct credentials
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        // If Supabase auth fails, the user needs to be registered first
+        if (authError.message.includes('Invalid login credentials')) {
+          // Try to sign up the admin user
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          });
+          
+          if (signUpError) {
+            throw new Error('خطأ في إعداد حساب المدير');
+          }
+          
+          // After signup, try to sign in again
+          const { data: retryAuthData, error: retryAuthError } = await supabase.auth.signInWithPassword({
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          });
+          
+          if (retryAuthError) throw retryAuthError;
+        } else {
+          throw authError;
+        }
+      }
 
-      // Check if the user is an admin
+      // Check if the user is an admin in our admin_users table
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
-        .eq('user_id', authData.user.id)
+        .eq('email', ADMIN_EMAIL)
         .eq('is_active', true)
         .single();
 
