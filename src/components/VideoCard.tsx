@@ -8,6 +8,9 @@ interface VideoCardProps {
     category: string;
     thumbnail: string;
     duration: string;
+    youtube_url?: string;
+    youtube_id?: string;
+    views?: number;
   };
   onSelect: () => void;
 }
@@ -15,18 +18,18 @@ interface VideoCardProps {
 const VideoCard = ({ video, onSelect }: VideoCardProps) => {
   const getCategoryColor = (category: string) => {
     const colors = {
-      'العقلية': 'bg-blue-100 text-blue-800',
-      'الإنتاجية': 'bg-green-100 text-green-800',
-      'القيادة': 'bg-purple-100 text-purple-800',
-      'العافية': 'bg-pink-100 text-pink-800',
-      'المهنة': 'bg-yellow-100 text-yellow-800'
+      'العقلية والتطوير الذاتي': 'bg-blue-100 text-blue-800',
+      'اللياقة البدنية والصحة': 'bg-green-100 text-green-800',
+      'الإنتاجية والتنظيم': 'bg-purple-100 text-purple-800',
+      'القيادة والأعمال': 'bg-pink-100 text-pink-800',
+      'غير مصنف': 'bg-gray-100 text-gray-800'
     };
     return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   return (
     <div 
-      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden font-cairo"
+      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-smooth cursor-pointer group overflow-hidden font-cairo mobile-touch"
       onClick={onSelect}
     >
       {/* Thumbnail */}
@@ -34,10 +37,11 @@ const VideoCard = ({ video, onSelect }: VideoCardProps) => {
         <img 
           src={video.thumbnail}
           alt={video.title}
-          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-48 object-cover group-hover:scale-105 transition-smooth"
+          loading="lazy"
         />
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-200">
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-smooth flex items-center justify-center">
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-smooth">
             <Play size={16} className="text-blue-600 mr-0.5" />
           </div>
         </div>
@@ -55,7 +59,7 @@ const VideoCard = ({ video, onSelect }: VideoCardProps) => {
           <span className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 arabic-text ${getCategoryColor(video.category)}`}>
             {video.category}
           </span>
-          <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors duration-200 leading-tight arabic-text">
+          <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-smooth leading-tight arabic-text high-contrast">
             {video.title}
           </h3>
         </div>
@@ -63,6 +67,12 @@ const VideoCard = ({ video, onSelect }: VideoCardProps) => {
         <p className="text-slate-600 text-sm leading-relaxed line-clamp-2 arabic-text">
           {video.description}
         </p>
+
+        {video.views !== undefined && (
+          <div className="text-xs text-slate-500 arabic-text">
+            {video.views} مشاهدة
+          </div>
+        )}
       </div>
     </div>
   );

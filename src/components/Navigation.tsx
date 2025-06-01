@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Settings } from 'lucide-react';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,12 +13,12 @@ const Navigation = () => {
   ];
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50 font-cairo">
+    <nav className="bg-white shadow-sm sticky top-0 z-50 font-cairo mobile-nav">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <h1 className="text-2xl font-bold text-slate-800 arabic-heading">منصة التدريب</h1>
+            <h1 className="text-2xl font-bold text-slate-800 arabic-heading high-contrast">منصة التدريب</h1>
           </div>
 
           {/* Desktop Navigation */}
@@ -28,11 +28,18 @@ const Navigation = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className="text-slate-600 hover:text-slate-900 px-3 py-2 text-sm font-medium transition-colors duration-200 arabic-text"
+                  className="text-slate-600 hover:text-slate-900 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced"
                 >
                   {link.name}
                 </a>
               ))}
+              <a
+                href="/admin"
+                className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
+              >
+                <Settings size={16} />
+                الإدارة
+              </a>
             </div>
           </div>
 
@@ -40,7 +47,7 @@ const Navigation = () => {
           <div className="md:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-slate-600 hover:text-slate-900 p-2"
+              className="text-slate-600 hover:text-slate-900 p-2 mobile-touch transition-smooth"
             >
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -55,12 +62,20 @@ const Navigation = () => {
                 <a
                   key={link.name}
                   href={link.href}
-                  className="text-slate-600 hover:text-slate-900 block px-3 py-2 text-base font-medium arabic-text"
+                  className="text-slate-600 hover:text-slate-900 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.name}
                 </a>
               ))}
+              <a
+                href="/admin"
+                className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Settings size={16} />
+                لوحة الإدارة
+              </a>
             </div>
           </div>
         )}
