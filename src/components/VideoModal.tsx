@@ -29,19 +29,19 @@ const VideoModal = ({ video, onClose }: VideoModalProps) => {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4 font-cairo">
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-slate-900 truncate pr-4">
-            {video.title}
-          </h2>
           <button 
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors duration-200"
           >
             <X size={24} />
           </button>
+          <h2 className="text-xl font-semibold text-slate-900 truncate pl-4 arabic-text text-right">
+            {video.title}
+          </h2>
         </div>
 
         {/* Video Player */}
@@ -57,9 +57,9 @@ const VideoModal = ({ video, onClose }: VideoModalProps) => {
         </div>
 
         {/* Description */}
-        <div className="p-6">
-          <h3 className="font-semibold text-slate-900 mb-3">About this video</h3>
-          <p className="text-slate-600 leading-relaxed">
+        <div className="p-6 text-right">
+          <h3 className="font-semibold text-slate-900 mb-3 arabic-text">حول هذا الفيديو</h3>
+          <p className="text-slate-600 leading-relaxed arabic-text">
             {video.description}
           </p>
         </div>
