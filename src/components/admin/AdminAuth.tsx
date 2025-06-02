@@ -1,6 +1,5 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,8 +16,6 @@ const AdminAuth = ({ onAuthSuccess }: AdminAuthProps) => {
   const [error, setError] = useState('');
 
   const CORRECT_PIN = '1994';
-  const ADMIN_EMAIL = 'la.observation.digital@gmail.com';
-  const ADMIN_PASSWORD = 'ayoub1994??%%';
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,53 +23,13 @@ const AdminAuth = ({ onAuthSuccess }: AdminAuthProps) => {
     setError('');
 
     try {
-      // Validate PIN code
+      // Simple PIN validation
       if (pinCode !== CORRECT_PIN) {
         throw new Error('رمز PIN غير صحيح - يرجى المحاولة مرة أخرى');
       }
 
-      // Authenticate with Supabase using admin credentials
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      });
-
-      if (authError) {
-        // If auth fails, try to sign up first
-        if (authError.message.includes('Invalid login credentials')) {
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          });
-          
-          if (signUpError) {
-            throw new Error('خطأ في إعداد حساب المدير');
-          }
-          
-          // Retry login
-          const { data: retryAuthData, error: retryAuthError } = await supabase.auth.signInWithPassword({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          });
-          
-          if (retryAuthError) throw retryAuthError;
-        } else {
-          throw authError;
-        }
-      }
-
-      // Check admin status
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', ADMIN_EMAIL)
-        .eq('is_active', true)
-        .single();
-
-      if (adminError || !adminData) {
-        await supabase.auth.signOut();
-        throw new Error('غير مصرح لك بالوصول إلى لوحة التحكم');
-      }
+      // Simulate loading for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       onAuthSuccess();
     } catch (error: any) {
