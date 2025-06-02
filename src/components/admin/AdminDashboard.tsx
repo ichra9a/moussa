@@ -85,9 +85,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/';
+  const handleLogout = () => {
+    // Simple logout - just reload the page to go back to PIN entry
+    window.location.reload();
   };
 
   const handleVideoSaved = () => {
