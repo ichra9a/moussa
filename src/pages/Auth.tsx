@@ -11,13 +11,13 @@ import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -27,29 +27,79 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        // Login with PIN
+        if (!pinCode) {
+          setError('يرجى إدخال رمز PIN');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('students')
+          .select('*')
+          .eq('pin_code', pinCode)
+          .single();
+
+        if (error || !data) {
+          setError('رمز PIN غير صحيح');
+          return;
+        }
+
+        // Store student info in localStorage for session management
+        localStorage.setItem('student', JSON.stringify(data));
         navigate('/dashboard');
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: {
-              full_name: fullName,
-              phone: phone,
-            }
-          }
-        });
-        if (error) throw error;
-        setError('تم إرسال رابط التأكيد إلى بريدك الإلكتروني');
+        // Register with PIN
+        if (!firstName.trim() || !lastName.trim()) {
+          setError('يرجى إدخال الاسم الأول والأخير');
+          return;
+        }
+
+        if (!pinCode || pinCode.length < 4) {
+          setError('يجب أن يكون رمز PIN مكون من 4 أرقام على الأقل');
+          return;
+        }
+
+        if (pinCode !== confirmPin) {
+          setError('رمز PIN غير متطابق');
+          return;
+        }
+
+        // Check if PIN already exists
+        const { data: existingStudent } = await supabase
+          .from('students')
+          .select('id')
+          .eq('pin_code', pinCode)
+          .single();
+
+        if (existingStudent) {
+          setError('رمز PIN مستخدم بالفعل، يرجى اختيار رمز آخر');
+          return;
+        }
+
+        // Create new student
+        const { data, error } = await supabase
+          .from('students')
+          .insert({
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            full_name: `${firstName.trim()} ${lastName.trim()}`,
+            pin_code: pinCode,
+            email: `student_${pinCode}@temp.com` // Temporary email for database compatibility
+          })
+          .select()
+          .single();
+
+        if (error) {
+          setError('حدث خطأ أثناء إنشاء الحساب');
+          return;
+        }
+
+        // Store student info in localStorage
+        localStorage.setItem('student', JSON.stringify(data));
+        navigate('/dashboard');
       }
     } catch (error: any) {
-      setError(error.message || 'حدث خطأ، يرجى المحاولة مرة أخرى');
+      setError('حدث خطأ، يرجى المحاولة مرة أخرى');
     } finally {
       setLoading(false);
     }
@@ -68,14 +118,14 @@ const Auth = () => {
             {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
           </CardTitle>
           <p className="text-slate-600 arabic-text text-lg">
-            {isLogin ? 'مرحباً بك مرة أخرى' : 'انضم إلينا وابدأ التعلم'}
+            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'أنشئ حسابك الجديد'}
           </p>
         </CardHeader>
         <CardContent className="px-8 pb-12">
           <form onSubmit={handleAuth} className="space-y-6">
             {error && (
-              <Alert variant={error.includes('تم إرسال') ? 'default' : 'destructive'} className="border-blue-200 bg-blue-50">
-                <AlertDescription className="arabic-text text-blue-700 font-medium">
+              <Alert variant="destructive" className="border-red-200 bg-red-50">
+                <AlertDescription className="arabic-text text-red-700 font-medium">
                   {error}
                 </AlertDescription>
               </Alert>
@@ -84,67 +134,76 @@ const Auth = () => {
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="arabic-text font-semibold">الاسم الكامل</Label>
+                  <Label htmlFor="firstName" className="arabic-text font-semibold">الاسم الأول</Label>
                   <Input
-                    id="fullName"
+                    id="firstName"
                     type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     required
                     className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل اسمك الكامل"
+                    placeholder="أدخل اسمك الأول"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone" className="arabic-text font-semibold">رقم الهاتف (اختياري)</Label>
+                  <Label htmlFor="lastName" className="arabic-text font-semibold">الاسم الأخير</Label>
                   <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
                     className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل رقم هاتفك"
+                    placeholder="أدخل اسمك الأخير"
                   />
                 </div>
               </>
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email" className="arabic-text font-semibold">البريد الإلكتروني</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                placeholder="أدخل بريدك الإلكتروني"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" className="arabic-text font-semibold">كلمة المرور</Label>
+              <Label htmlFor="pinCode" className="arabic-text font-semibold">
+                {isLogin ? 'رمز PIN' : 'اختر رمز PIN (4 أرقام على الأقل)'}
+              </Label>
               <div className="relative">
                 <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="pinCode"
+                  type={showPin ? 'text' : 'password'}
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
                   required
                   className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl pl-12"
-                  placeholder="أدخل كلمة المرور"
+                  placeholder={isLogin ? "أدخل رمز PIN" : "مثال: 1234"}
+                  maxLength={6}
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="absolute left-2 top-1/2 transform -translate-y-1/2"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPin(!showPin)}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
                 </Button>
               </div>
             </div>
+
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPin" className="arabic-text font-semibold">تأكيد رمز PIN</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPin"
+                    type={showPin ? 'text' : 'password'}
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
+                    placeholder="أعد إدخال رمز PIN"
+                    maxLength={6}
+                  />
+                </div>
+              </div>
+            )}
             
             <Button 
               type="submit" 

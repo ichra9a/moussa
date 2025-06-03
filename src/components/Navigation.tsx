@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { user, student, signOut } = useAuth();
+  const { student, signOut } = useAuth();
 
   const navLinks = [
     { name: 'الرئيسية', href: '#home' },
@@ -37,7 +37,7 @@ const Navigation = () => {
                 </a>
               ))}
               
-              {user ? (
+              {student ? (
                 <>
                   <a
                     href="/dashboard"
@@ -100,7 +100,7 @@ const Navigation = () => {
                 </a>
               ))}
               
-              {user ? (
+              {student ? (
                 <>
                   <a
                     href="/dashboard"
