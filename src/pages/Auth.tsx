@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +15,7 @@ const Auth = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
   const navigate = useNavigate();
 
@@ -76,51 +75,28 @@ const Auth = () => {
           return;
         }
 
-        // Create new student with manual insert to avoid type issues
+        // Create new student with direct insert
         const { data, error } = await supabase
-          .rpc('create_student_with_pin', {
-            p_first_name: firstName.trim(),
-            p_last_name: lastName.trim(),
-            p_full_name: `${firstName.trim()} ${lastName.trim()}`,
-            p_pin_code: pinCode,
-            p_email: `student_${pinCode}@temp.com`
-          });
+          .from('students')
+          .insert({
+            first_name: firstName.trim(),
+            last_name: lastName.trim(),
+            full_name: `${firstName.trim()} ${lastName.trim()}`,
+            pin_code: pinCode,
+            email: `student_${pinCode}@temp.com`
+          })
+          .select()
+          .single();
 
         if (error) {
-          // Fallback to direct insert if RPC doesn't exist
-          const { data: insertData, error: insertError } = await supabase
-            .from('students')
-            .insert({
-              first_name: firstName.trim(),
-              last_name: lastName.trim(),
-              full_name: `${firstName.trim()} ${lastName.trim()}`,
-              pin_code: pinCode,
-              email: `student_${pinCode}@temp.com`
-            } as any)
-            .select()
-            .single();
-
-          if (insertError) {
-            setError('حدث خطأ أثناء إنشاء الحساب');
-            return;
-          }
-
-          // Store student info in localStorage
-          localStorage.setItem('student', JSON.stringify(insertData));
-          navigate('/dashboard');
-        } else {
-          // If RPC worked, fetch the created student
-          const { data: studentData } = await supabase
-            .from('students')
-            .select('*')
-            .eq('pin_code', pinCode)
-            .single();
-
-          if (studentData) {
-            localStorage.setItem('student', JSON.stringify(studentData));
-            navigate('/dashboard');
-          }
+          console.error('Registration error:', error);
+          setError('حدث خطأ أثناء إنشاء الحساب');
+          return;
         }
+
+        // Store student info in localStorage
+        localStorage.setItem('student', JSON.stringify(data));
+        navigate('/dashboard');
       }
     } catch (error: any) {
       console.error('Auth error:', error);
