@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,8 +13,6 @@ const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [pinCode, setPinCode] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
@@ -47,12 +46,7 @@ const Auth = () => {
         localStorage.setItem('student', JSON.stringify(data));
         navigate('/dashboard');
       } else {
-        // Register with PIN
-        if (!firstName.trim() || !lastName.trim()) {
-          setError('يرجى إدخال الاسم الأول والأخير');
-          return;
-        }
-
+        // Register with PIN only
         if (!pinCode || pinCode.length < 4) {
           setError('يجب أن يكون رمز PIN مكون من 4 أرقام على الأقل');
           return;
@@ -75,15 +69,15 @@ const Auth = () => {
           return;
         }
 
-        // Create new student with direct insert
+        // Create new student with PIN only
         const { data, error } = await supabase
           .from('students')
           .insert({
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`,
             pin_code: pinCode,
-            email: `student_${pinCode}@temp.com`
+            email: `student_${pinCode}@temp.com`,
+            full_name: `Student ${pinCode}`,
+            first_name: 'Student',
+            last_name: pinCode
           })
           .select()
           .single();
@@ -119,7 +113,7 @@ const Auth = () => {
             {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
           </CardTitle>
           <p className="text-slate-600 arabic-text text-lg">
-            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'أنشئ حسابك الجديد'}
+            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'اختر رمز PIN للدخول إلى المنصة'}
           </p>
         </CardHeader>
         <CardContent className="px-8 pb-12">
@@ -130,35 +124,6 @@ const Auth = () => {
                   {error}
                 </AlertDescription>
               </Alert>
-            )}
-            
-            {!isLogin && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="arabic-text font-semibold">الاسم الأول</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل اسمك الأول"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="arabic-text font-semibold">الاسم الأخير</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل اسمك الأخير"
-                  />
-                </div>
-              </>
             )}
             
             <div className="space-y-2">
