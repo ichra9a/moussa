@@ -37,7 +37,7 @@ const Auth = () => {
           .from('students')
           .select('*')
           .eq('pin_code', pinCode)
-          .single();
+          .maybeSingle();
 
         if (error || !data) {
           setError('رمز PIN غير صحيح');
@@ -69,36 +69,61 @@ const Auth = () => {
           .from('students')
           .select('id')
           .eq('pin_code', pinCode)
-          .single();
+          .maybeSingle();
 
         if (existingStudent) {
           setError('رمز PIN مستخدم بالفعل، يرجى اختيار رمز آخر');
           return;
         }
 
-        // Create new student
+        // Create new student with manual insert to avoid type issues
         const { data, error } = await supabase
-          .from('students')
-          .insert({
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`,
-            pin_code: pinCode,
-            email: `student_${pinCode}@temp.com` // Temporary email for database compatibility
-          })
-          .select()
-          .single();
+          .rpc('create_student_with_pin', {
+            p_first_name: firstName.trim(),
+            p_last_name: lastName.trim(),
+            p_full_name: `${firstName.trim()} ${lastName.trim()}`,
+            p_pin_code: pinCode,
+            p_email: `student_${pinCode}@temp.com`
+          });
 
         if (error) {
-          setError('حدث خطأ أثناء إنشاء الحساب');
-          return;
-        }
+          // Fallback to direct insert if RPC doesn't exist
+          const { data: insertData, error: insertError } = await supabase
+            .from('students')
+            .insert({
+              first_name: firstName.trim(),
+              last_name: lastName.trim(),
+              full_name: `${firstName.trim()} ${lastName.trim()}`,
+              pin_code: pinCode,
+              email: `student_${pinCode}@temp.com`
+            } as any)
+            .select()
+            .single();
 
-        // Store student info in localStorage
-        localStorage.setItem('student', JSON.stringify(data));
-        navigate('/dashboard');
+          if (insertError) {
+            setError('حدث خطأ أثناء إنشاء الحساب');
+            return;
+          }
+
+          // Store student info in localStorage
+          localStorage.setItem('student', JSON.stringify(insertData));
+          navigate('/dashboard');
+        } else {
+          // If RPC worked, fetch the created student
+          const { data: studentData } = await supabase
+            .from('students')
+            .select('*')
+            .eq('pin_code', pinCode)
+            .single();
+
+          if (studentData) {
+            localStorage.setItem('student', JSON.stringify(studentData));
+            navigate('/dashboard');
+          }
+        }
       }
     } catch (error: any) {
+      console.error('Auth error:', error);
       setError('حدث خطأ، يرجى المحاولة مرة أخرى');
     } finally {
       setLoading(false);
