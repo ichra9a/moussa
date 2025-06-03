@@ -1,9 +1,12 @@
 
 import { useState } from 'react';
-import { Menu, X, Settings } from 'lucide-react';
+import { Menu, X, Settings, User, LogIn } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, student, signOut } = useAuth();
 
   const navLinks = [
     { name: 'الرئيسية', href: '#home' },
@@ -33,6 +36,34 @@ const Navigation = () => {
                   {link.name}
                 </a>
               ))}
+              
+              {user ? (
+                <>
+                  <a
+                    href="/dashboard"
+                    className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
+                  >
+                    <User size={16} />
+                    لوحة الطالب
+                  </a>
+                  <Button
+                    onClick={signOut}
+                    variant="ghost"
+                    className="text-slate-600 hover:text-red-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text"
+                  >
+                    تسجيل الخروج
+                  </Button>
+                </>
+              ) : (
+                <a
+                  href="/auth"
+                  className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
+                >
+                  <LogIn size={16} />
+                  تسجيل الدخول
+                </a>
+              )}
+              
               <a
                 href="/admin"
                 className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
@@ -68,6 +99,39 @@ const Navigation = () => {
                   {link.name}
                 </a>
               ))}
+              
+              {user ? (
+                <>
+                  <a
+                    href="/dashboard"
+                    className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <User size={16} />
+                    لوحة الطالب
+                  </a>
+                  <Button
+                    onClick={() => {
+                      signOut();
+                      setIsMenuOpen(false);
+                    }}
+                    variant="ghost"
+                    className="text-slate-600 hover:text-red-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth w-full text-right"
+                  >
+                    تسجيل الخروج
+                  </Button>
+                </>
+              ) : (
+                <a
+                  href="/auth"
+                  className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <LogIn size={16} />
+                  تسجيل الدخول
+                </a>
+              )}
+              
               <a
                 href="/admin"
                 className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
