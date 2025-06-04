@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,53 +83,27 @@ const Auth = () => {
         }
 
         if (userType === 'student') {
-          // Create new student - using direct insert without RLS restrictions
-          const { data, error } = await supabase
-            .rpc('create_student', {
+          // Create new student - direct insert approach
+          const { data: studentData, error: insertError } = await supabase
+            .from('students')
+            .insert({
               pin_code: pinCode,
-              full_name: `Student ${pinCode}`,
               email: `student_${pinCode}@temp.com`,
+              full_name: `Student ${pinCode}`,
               first_name: 'Student',
               last_name: pinCode
-            });
+            })
+            .select()
+            .single();
 
-          if (error) {
-            console.error('Student registration error:', error);
-            // Fallback to direct insert
-            const { data: studentData, error: insertError } = await supabase
-              .from('students')
-              .insert({
-                pin_code: pinCode,
-                email: `student_${pinCode}@temp.com`,
-                full_name: `Student ${pinCode}`,
-                first_name: 'Student',
-                last_name: pinCode
-              })
-              .select()
-              .single();
-
-            if (insertError) {
-              console.error('Direct insert error:', insertError);
-              setError('حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مرة أخرى');
-              return;
-            }
-
-            localStorage.setItem('student', JSON.stringify(studentData));
-            navigate('/dashboard');
+          if (insertError) {
+            console.error('Student registration error:', insertError);
+            setError('حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مرة أخرى');
             return;
           }
 
-          // Get the created student
-          const { data: newStudent } = await supabase
-            .from('students')
-            .select('*')
-            .eq('pin_code', pinCode)
-            .single();
-
-          if (newStudent) {
-            localStorage.setItem('student', JSON.stringify(newStudent));
-            navigate('/dashboard');
-          }
+          localStorage.setItem('student', JSON.stringify(studentData));
+          navigate('/dashboard');
         } else {
           // Create new coach - same PIN-only approach as students
           const { data, error } = await supabase
