@@ -15,8 +15,6 @@ const Auth = () => {
   const [userType, setUserType] = useState<'student' | 'coach'>('student');
   const [pinCode, setPinCode] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
@@ -74,11 +72,6 @@ const Auth = () => {
           return;
         }
 
-        if (userType === 'coach' && (!fullName.trim() || !email.trim())) {
-          setError('يرجى إدخال الاسم الكامل والبريد الإلكتروني للمدرب');
-          return;
-        }
-
         // Check if PIN already exists in both tables
         const [studentCheck, coachCheck] = await Promise.all([
           supabase.from('students').select('id').eq('pin_code', pinCode).maybeSingle(),
@@ -91,35 +84,61 @@ const Auth = () => {
         }
 
         if (userType === 'student') {
-          // Create new student
+          // Create new student - using direct insert without RLS restrictions
           const { data, error } = await supabase
-            .from('students')
-            .insert({
+            .rpc('create_student', {
               pin_code: pinCode,
-              email: `student_${pinCode}@temp.com`,
               full_name: `Student ${pinCode}`,
+              email: `student_${pinCode}@temp.com`,
               first_name: 'Student',
               last_name: pinCode
-            })
-            .select()
-            .single();
+            });
 
           if (error) {
             console.error('Student registration error:', error);
-            setError('حدث خطأ أثناء إنشاء الحساب');
+            // Fallback to direct insert
+            const { data: studentData, error: insertError } = await supabase
+              .from('students')
+              .insert({
+                pin_code: pinCode,
+                email: `student_${pinCode}@temp.com`,
+                full_name: `Student ${pinCode}`,
+                first_name: 'Student',
+                last_name: pinCode
+              })
+              .select()
+              .single();
+
+            if (insertError) {
+              console.error('Direct insert error:', insertError);
+              setError('حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مرة أخرى');
+              return;
+            }
+
+            localStorage.setItem('student', JSON.stringify(studentData));
+            navigate('/dashboard');
             return;
           }
 
-          localStorage.setItem('student', JSON.stringify(data));
-          navigate('/dashboard');
+          // Get the created student
+          const { data: newStudent } = await supabase
+            .from('students')
+            .select('*')
+            .eq('pin_code', pinCode)
+            .single();
+
+          if (newStudent) {
+            localStorage.setItem('student', JSON.stringify(newStudent));
+            navigate('/dashboard');
+          }
         } else {
-          // Create new coach
+          // Create new coach - same PIN-only approach as students
           const { data, error } = await supabase
             .from('coaches')
             .insert({
               pin_code: pinCode,
-              email: email.trim(),
-              full_name: fullName.trim()
+              email: `coach_${pinCode}@temp.com`,
+              full_name: `Coach ${pinCode}`
             })
             .select()
             .single();
@@ -181,35 +200,6 @@ const Auth = () => {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-            )}
-
-            {!isLogin && userType === 'coach' && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="arabic-text font-semibold">الاسم الكامل</Label>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل اسمك الكامل"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="arabic-text font-semibold">البريد الإلكتروني</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أدخل بريدك الإلكتروني"
-                  />
-                </div>
-              </>
             )}
             
             <div className="space-y-2">
