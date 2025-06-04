@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import StudentDashboard from "./pages/StudentDashboard";
+import CoachDashboard from "./pages/CoachDashboard";
 import CourseView from "./pages/CourseView";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -31,6 +32,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <StudentDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/coach-dashboard" 
+              element={
+                <ProtectedRoute>
+                  <CoachDashboard />
                 </ProtectedRoute>
               } 
             />

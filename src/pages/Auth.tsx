@@ -7,12 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Eye, EyeOff, GraduationCap, Users } from 'lucide-react';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [userType, setUserType] = useState<'student' | 'coach'>('student');
   const [pinCode, setPinCode] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
@@ -31,22 +35,35 @@ const Auth = () => {
           return;
         }
 
-        const { data, error } = await supabase
+        // Try to find user in students table first
+        const { data: student, error: studentError } = await supabase
           .from('students')
           .select('*')
           .eq('pin_code', pinCode)
           .maybeSingle();
 
-        if (error || !data) {
-          setError('رمز PIN غير صحيح');
+        if (student) {
+          localStorage.setItem('student', JSON.stringify(student));
+          navigate('/dashboard');
           return;
         }
 
-        // Store student info in localStorage for session management
-        localStorage.setItem('student', JSON.stringify(data));
-        navigate('/dashboard');
+        // Try to find user in coaches table
+        const { data: coach, error: coachError } = await supabase
+          .from('coaches')
+          .select('*')
+          .eq('pin_code', pinCode)
+          .maybeSingle();
+
+        if (coach) {
+          localStorage.setItem('coach', JSON.stringify(coach));
+          navigate('/coach-dashboard');
+          return;
+        }
+
+        setError('رمز PIN غير صحيح');
       } else {
-        // Register with PIN only
+        // Register with PIN
         if (!pinCode || pinCode.length < 4) {
           setError('يجب أن يكون رمز PIN مكون من 4 أرقام على الأقل');
           return;
@@ -57,40 +74,65 @@ const Auth = () => {
           return;
         }
 
-        // Check if PIN already exists
-        const { data: existingStudent } = await supabase
-          .from('students')
-          .select('id')
-          .eq('pin_code', pinCode)
-          .maybeSingle();
+        if (userType === 'coach' && (!fullName.trim() || !email.trim())) {
+          setError('يرجى إدخال الاسم الكامل والبريد الإلكتروني للمدرب');
+          return;
+        }
 
-        if (existingStudent) {
+        // Check if PIN already exists in both tables
+        const [studentCheck, coachCheck] = await Promise.all([
+          supabase.from('students').select('id').eq('pin_code', pinCode).maybeSingle(),
+          supabase.from('coaches').select('id').eq('pin_code', pinCode).maybeSingle()
+        ]);
+
+        if (studentCheck.data || coachCheck.data) {
           setError('رمز PIN مستخدم بالفعل، يرجى اختيار رمز آخر');
           return;
         }
 
-        // Create new student with PIN only
-        const { data, error } = await supabase
-          .from('students')
-          .insert({
-            pin_code: pinCode,
-            email: `student_${pinCode}@temp.com`,
-            full_name: `Student ${pinCode}`,
-            first_name: 'Student',
-            last_name: pinCode
-          })
-          .select()
-          .single();
+        if (userType === 'student') {
+          // Create new student
+          const { data, error } = await supabase
+            .from('students')
+            .insert({
+              pin_code: pinCode,
+              email: `student_${pinCode}@temp.com`,
+              full_name: `Student ${pinCode}`,
+              first_name: 'Student',
+              last_name: pinCode
+            })
+            .select()
+            .single();
 
-        if (error) {
-          console.error('Registration error:', error);
-          setError('حدث خطأ أثناء إنشاء الحساب');
-          return;
+          if (error) {
+            console.error('Student registration error:', error);
+            setError('حدث خطأ أثناء إنشاء الحساب');
+            return;
+          }
+
+          localStorage.setItem('student', JSON.stringify(data));
+          navigate('/dashboard');
+        } else {
+          // Create new coach
+          const { data, error } = await supabase
+            .from('coaches')
+            .insert({
+              pin_code: pinCode,
+              email: email.trim(),
+              full_name: fullName.trim()
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Coach registration error:', error);
+            setError('حدث خطأ أثناء إنشاء حساب المدرب');
+            return;
+          }
+
+          localStorage.setItem('coach', JSON.stringify(data));
+          navigate('/coach-dashboard');
         }
-
-        // Store student info in localStorage
-        localStorage.setItem('student', JSON.stringify(data));
-        navigate('/dashboard');
       }
     } catch (error: any) {
       console.error('Auth error:', error);
@@ -113,7 +155,7 @@ const Auth = () => {
             {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
           </CardTitle>
           <p className="text-slate-600 arabic-text text-lg">
-            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'اختر رمز PIN للدخول إلى المنصة'}
+            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'اختر نوع الحساب ورمز PIN'}
           </p>
         </CardHeader>
         <CardContent className="px-8 pb-12">
@@ -124,6 +166,50 @@ const Auth = () => {
                   {error}
                 </AlertDescription>
               </Alert>
+            )}
+
+            {!isLogin && (
+              <Tabs value={userType} onValueChange={(value: 'student' | 'coach') => setUserType(value)} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="student" className="flex items-center gap-2 arabic-text">
+                    <GraduationCap size={16} />
+                    طالب
+                  </TabsTrigger>
+                  <TabsTrigger value="coach" className="flex items-center gap-2 arabic-text">
+                    <Users size={16} />
+                    مدرب
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+
+            {!isLogin && userType === 'coach' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName" className="arabic-text font-semibold">الاسم الكامل</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
+                    placeholder="أدخل اسمك الكامل"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="arabic-text font-semibold">البريد الإلكتروني</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
+                    placeholder="أدخل بريدك الإلكتروني"
+                  />
+                </div>
+              </>
             )}
             
             <div className="space-y-2">

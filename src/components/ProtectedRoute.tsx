@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { student, loading } = useAuth();
+  const { student, coach, loading } = useAuth();
 
   if (loading) {
     return (
@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     );
   }
 
-  if (!student) {
+  if (!student && !coach) {
     return <Navigate to="/auth" replace />;
   }
 

@@ -7,6 +7,7 @@ import VideoModal from '../components/VideoModal';
 import SearchSection from '../components/SearchSection';
 import AboutSection from '../components/AboutSection';
 import ContactSection from '../components/ContactSection';
+import CourseSubscriptionSection from '../components/CourseSubscriptionSection';
 
 const Index = () => {
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -17,6 +18,7 @@ const Index = () => {
       <Navigation />
       <Hero onVideoSelect={setSelectedVideo} />
       <SearchSection searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <CourseSubscriptionSection />
       <FeaturedCategories onVideoSelect={setSelectedVideo} searchQuery={searchQuery} />
       <AboutSection />
       <ContactSection />

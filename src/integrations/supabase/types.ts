@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          created_at: string
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_users: {
         Row: {
           created_at: string
@@ -56,6 +80,33 @@ export type Database = {
           id?: string
           name?: string
           thumbnail?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      coaches: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          pin_code: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          pin_code: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          pin_code?: string
           updated_at?: string
         }
         Relationships: []
@@ -197,6 +248,51 @@ export type Database = {
             columns: ["module_id"]
             isOneToOne: true
             referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_subscriptions: {
+        Row: {
+          completed_at: string | null
+          id: string
+          is_active: boolean | null
+          module_id: string
+          progress: number | null
+          student_id: string
+          subscribed_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_id: string
+          progress?: number | null
+          student_id: string
+          subscribed_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          module_id?: string
+          progress?: number | null
+          student_id?: string
+          subscribed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_subscriptions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_subscriptions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -377,7 +473,7 @@ export type Database = {
           id: string
           last_name: string | null
           phone: string | null
-          pin_code: string | null
+          pin_code: string
           updated_at: string
           user_id: string | null
         }
@@ -389,7 +485,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           phone?: string | null
-          pin_code?: string | null
+          pin_code: string
           updated_at?: string
           user_id?: string | null
         }
@@ -401,7 +497,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           phone?: string | null
-          pin_code?: string | null
+          pin_code?: string
           updated_at?: string
           user_id?: string | null
         }
