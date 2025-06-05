@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,7 +106,7 @@ const Auth = () => {
               p_full_name: `Student ${pinCode}`,
               p_first_name: 'Student',
               p_last_name: pinCode
-            } as any);
+            });
 
           console.log('Student creation result:', { studentData, insertError });
 
@@ -134,7 +135,7 @@ const Auth = () => {
               p_pin_code: pinCode,
               p_email: `coach_${pinCode}@temp.com`,
               p_full_name: `Coach ${pinCode}`
-            } as any);
+            });
 
           console.log('Coach creation result:', { coachData, insertError });
 
