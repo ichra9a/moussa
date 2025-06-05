@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -98,18 +97,15 @@ const Auth = () => {
         if (userType === 'student') {
           console.log('Creating new student...');
           
-          // Create new student
+          // Use RPC call to bypass RLS for registration
           const { data: studentData, error: insertError } = await supabase
-            .from('students')
-            .insert({
-              pin_code: pinCode,
-              email: `student_${pinCode}@temp.com`,
-              full_name: `Student ${pinCode}`,
-              first_name: 'Student',
-              last_name: pinCode
-            })
-            .select()
-            .single();
+            .rpc('create_student', {
+              p_pin_code: pinCode,
+              p_email: `student_${pinCode}@temp.com`,
+              p_full_name: `Student ${pinCode}`,
+              p_first_name: 'Student',
+              p_last_name: pinCode
+            });
 
           console.log('Student creation result:', { studentData, insertError });
 
@@ -119,22 +115,26 @@ const Auth = () => {
             return;
           }
 
+          // Fetch the created student
+          const { data: newStudent } = await supabase
+            .from('students')
+            .select('*')
+            .eq('pin_code', pinCode)
+            .single();
+
           console.log('Student created successfully, storing in localStorage and navigating...');
-          localStorage.setItem('student', JSON.stringify(studentData));
+          localStorage.setItem('student', JSON.stringify(newStudent));
           navigate('/dashboard');
         } else {
           console.log('Creating new coach...');
           
-          // Create new coach
+          // Use RPC call to bypass RLS for registration
           const { data: coachData, error: insertError } = await supabase
-            .from('coaches')
-            .insert({
-              pin_code: pinCode,
-              email: `coach_${pinCode}@temp.com`,
-              full_name: `Coach ${pinCode}`
-            })
-            .select()
-            .single();
+            .rpc('create_coach', {
+              p_pin_code: pinCode,
+              p_email: `coach_${pinCode}@temp.com`,
+              p_full_name: `Coach ${pinCode}`
+            });
 
           console.log('Coach creation result:', { coachData, insertError });
 
@@ -144,8 +144,15 @@ const Auth = () => {
             return;
           }
 
+          // Fetch the created coach
+          const { data: newCoach } = await supabase
+            .from('coaches')
+            .select('*')
+            .eq('pin_code', pinCode)
+            .single();
+
           console.log('Coach created successfully, storing in localStorage and navigating...');
-          localStorage.setItem('coach', JSON.stringify(coachData));
+          localStorage.setItem('coach', JSON.stringify(newCoach));
           navigate('/coach-dashboard');
         }
       }

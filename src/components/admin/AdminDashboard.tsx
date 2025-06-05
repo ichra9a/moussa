@@ -1,14 +1,14 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Video, Folder, LogOut } from 'lucide-react';
+import { Plus, Video, Folder, LogOut, Users } from 'lucide-react';
 import AdminVideoForm from './AdminVideoForm';
 import AdminCategoryForm from './AdminCategoryForm';
 import VideoManagement from './VideoManagement';
 import CategoryManagement from './CategoryManagement';
+import CourseAdministration from './CourseAdministration';
 
 // Define types based on the database schema
 interface Category {
@@ -134,8 +134,9 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="overview" className="arabic-text">نظرة عامة</TabsTrigger>
+            <TabsTrigger value="courses" className="arabic-text">إدارة الدورات</TabsTrigger>
             <TabsTrigger value="videos" className="arabic-text">إدارة الفيديوهات</TabsTrigger>
             <TabsTrigger value="categories" className="arabic-text">إدارة الفئات</TabsTrigger>
           </TabsList>
@@ -178,12 +179,24 @@ const AdminDashboard = () => {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Button
+                onClick={() => {
+                  setActiveTab('courses');
+                }}
+                className="h-24 text-lg arabic-text"
+                size="lg"
+              >
+                <Users className="ml-2" size={24} />
+                إدارة الدورات والطلاب
+              </Button>
+
               <Button
                 onClick={() => {
                   setShowVideoForm(true);
                   setActiveTab('videos');
                 }}
+                variant="outline"
                 className="h-24 text-lg arabic-text"
                 size="lg"
               >
@@ -204,6 +217,10 @@ const AdminDashboard = () => {
                 إضافة فئة جديدة
               </Button>
             </div>
+          </TabsContent>
+
+          <TabsContent value="courses" className="space-y-6">
+            <CourseAdministration />
           </TabsContent>
 
           <TabsContent value="videos" className="space-y-6">
