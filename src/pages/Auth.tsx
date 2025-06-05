@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,14 +98,13 @@ const Auth = () => {
           console.log('Creating new student...');
           
           // Use RPC call to bypass RLS for registration
-          const { data: studentData, error: insertError } = await supabase
-            .rpc('create_student', {
-              p_pin_code: pinCode,
-              p_email: `student_${pinCode}@temp.com`,
-              p_full_name: `Student ${pinCode}`,
-              p_first_name: 'Student',
-              p_last_name: pinCode
-            });
+          const { data: studentData, error: insertError } = await (supabase as any).rpc('create_student', {
+            p_pin_code: pinCode,
+            p_email: `student_${pinCode}@temp.com`,
+            p_full_name: `Student ${pinCode}`,
+            p_first_name: 'Student',
+            p_last_name: pinCode
+          });
 
           console.log('Student creation result:', { studentData, insertError });
 
@@ -130,12 +128,11 @@ const Auth = () => {
           console.log('Creating new coach...');
           
           // Use RPC call to bypass RLS for registration
-          const { data: coachData, error: insertError } = await supabase
-            .rpc('create_coach', {
-              p_pin_code: pinCode,
-              p_email: `coach_${pinCode}@temp.com`,
-              p_full_name: `Coach ${pinCode}`
-            });
+          const { data: coachData, error: insertError } = await (supabase as any).rpc('create_coach', {
+            p_pin_code: pinCode,
+            p_email: `coach_${pinCode}@temp.com`,
+            p_full_name: `Coach ${pinCode}`
+          });
 
           console.log('Coach creation result:', { coachData, insertError });
 
