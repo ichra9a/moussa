@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,14 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Eye, EyeOff, GraduationCap, Users } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [userType, setUserType] = useState<'student' | 'coach'>('student');
   const [pinCode, setPinCode] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
@@ -25,135 +22,46 @@ const Auth = () => {
     setError('');
 
     try {
-      if (isLogin) {
-        // Login with PIN
-        if (!pinCode) {
-          setError('يرجى إدخال رمز PIN');
-          return;
-        }
-
-        console.log('Attempting login with PIN:', pinCode);
-
-        // Try to find user in students table first
-        const { data: student, error: studentError } = await supabase
-          .from('students')
-          .select('*')
-          .eq('pin_code', pinCode)
-          .maybeSingle();
-
-        console.log('Student lookup result:', { student, studentError });
-
-        if (student) {
-          localStorage.setItem('student', JSON.stringify(student));
-          console.log('Student logged in successfully:', student);
-          navigate('/dashboard');
-          return;
-        }
-
-        // Try to find user in coaches table
-        const { data: coach, error: coachError } = await supabase
-          .from('coaches')
-          .select('*')
-          .eq('pin_code', pinCode)
-          .maybeSingle();
-
-        console.log('Coach lookup result:', { coach, coachError });
-
-        if (coach) {
-          localStorage.setItem('coach', JSON.stringify(coach));
-          console.log('Coach logged in successfully:', coach);
-          navigate('/coach-dashboard');
-          return;
-        }
-
-        setError('رمز PIN غير صحيح');
-      } else {
-        // Register with PIN
-        if (!pinCode || pinCode.length < 4) {
-          setError('يجب أن يكون رمز PIN مكون من 4 أرقام على الأقل');
-          return;
-        }
-
-        if (pinCode !== confirmPin) {
-          setError('رمز PIN غير متطابق');
-          return;
-        }
-
-        console.log('Attempting registration for:', userType, 'with PIN:', pinCode);
-
-        // Check if PIN already exists in both tables
-        const [studentCheck, coachCheck] = await Promise.all([
-          supabase.from('students').select('id').eq('pin_code', pinCode).maybeSingle(),
-          supabase.from('coaches').select('id').eq('pin_code', pinCode).maybeSingle()
-        ]);
-
-        console.log('PIN check results:', { studentCheck, coachCheck });
-
-        if (studentCheck.data || coachCheck.data) {
-          setError('رمز PIN مستخدم بالفعل، يرجى اختيار رمز آخر');
-          return;
-        }
-
-        if (userType === 'student') {
-          console.log('Creating new student...');
-          
-          // Use RPC call to bypass RLS for registration
-          const { data: studentData, error: insertError } = await (supabase as any).rpc('create_student', {
-            p_pin_code: pinCode,
-            p_email: `student_${pinCode}@temp.com`,
-            p_full_name: `Student ${pinCode}`,
-            p_first_name: 'Student',
-            p_last_name: pinCode
-          });
-
-          console.log('Student creation result:', { studentData, insertError });
-
-          if (insertError) {
-            console.error('Student registration error:', insertError);
-            setError('حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مرة أخرى');
-            return;
-          }
-
-          // Fetch the created student
-          const { data: newStudent } = await supabase
-            .from('students')
-            .select('*')
-            .eq('pin_code', pinCode)
-            .single();
-
-          console.log('Student created successfully, storing in localStorage and navigating...');
-          localStorage.setItem('student', JSON.stringify(newStudent));
-          navigate('/dashboard');
-        } else {
-          console.log('Creating new coach...');
-          
-          // Use RPC call to bypass RLS for registration
-          const { data: coachData, error: insertError } = await (supabase as any).rpc('create_coach', {
-            p_pin_code: pinCode,
-            p_email: `coach_${pinCode}@temp.com`,
-            p_full_name: `Coach ${pinCode}`
-          });
-
-          console.log('Coach creation result:', { coachData, insertError });
-
-          if (insertError) {
-            console.error('Coach registration error:', insertError);
-            setError('حدث خطأ أثناء إنشاء حساب المدرب');
-            return;
-          }
-
-          // Fetch the created coach
-          const { data: newCoach } = await supabase
-            .from('coaches')
-            .select('*')
-            .eq('pin_code', pinCode)
-            .single();
-
-          console.log('Coach created successfully, storing in localStorage and navigating...');
-          localStorage.setItem('coach', JSON.stringify(newCoach));
-          navigate('/coach-dashboard');
-        }
+      if (!pinCode) {
+        setError('يرجى إدخال رمز PIN');
+        return;
       }
+
+      console.log('Attempting login with PIN:', pinCode);
+
+      // Try to find user in students table first
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('pin_code', pinCode)
+        .maybeSingle();
+
+      console.log('Student lookup result:', { student, studentError });
+
+      if (student) {
+        localStorage.setItem('student', JSON.stringify(student));
+        console.log('Student logged in successfully:', student);
+        navigate('/dashboard');
+        return;
+      }
+
+      // Try to find user in coaches table
+      const { data: coach, error: coachError } = await supabase
+        .from('coaches')
+        .select('*')
+        .eq('pin_code', pinCode)
+        .maybeSingle();
+
+      console.log('Coach lookup result:', { coach, coachError });
+
+      if (coach) {
+        localStorage.setItem('coach', JSON.stringify(coach));
+        console.log('Coach logged in successfully:', coach);
+        navigate('/coach-dashboard');
+        return;
+      }
+
+      setError('رمز PIN غير صحيح أو الحساب غير موجود. يرجى التواصل مع الإدارة لإنشاء حساب.');
     } catch (error: any) {
       console.error('Auth error:', error);
       setError('حدث خطأ، يرجى المحاولة مرة أخرى');
@@ -172,10 +80,13 @@ const Auth = () => {
             </svg>
           </div>
           <CardTitle className="text-3xl font-bold arabic-heading text-slate-800 mb-2">
-            {isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
+            تسجيل الدخول
           </CardTitle>
           <p className="text-slate-600 arabic-text text-lg">
-            {isLogin ? 'أدخل رمز PIN الخاص بك' : 'اختر نوع الحساب ورمز PIN'}
+            أدخل رمز PIN الخاص بك للدخول
+          </p>
+          <p className="text-slate-500 arabic-text text-sm mt-2">
+            لا تملك حساب؟ يرجى التواصل مع الإدارة لإنشاء حساب جديد
           </p>
         </CardHeader>
         <CardContent className="px-8 pb-12">
@@ -187,25 +98,10 @@ const Auth = () => {
                 </AlertDescription>
               </Alert>
             )}
-
-            {!isLogin && (
-              <Tabs value={userType} onValueChange={(value: 'student' | 'coach') => setUserType(value)} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="student" className="flex items-center gap-2 arabic-text">
-                    <GraduationCap size={16} />
-                    طالب
-                  </TabsTrigger>
-                  <TabsTrigger value="coach" className="flex items-center gap-2 arabic-text">
-                    <Users size={16} />
-                    مدرب
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
             
             <div className="space-y-2">
               <Label htmlFor="pinCode" className="arabic-text font-semibold">
-                {isLogin ? 'رمز PIN' : 'اختر رمز PIN (4 أرقام على الأقل)'}
+                رمز PIN
               </Label>
               <div className="relative">
                 <Input
@@ -215,7 +111,7 @@ const Auth = () => {
                   onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
                   required
                   className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl pl-12"
-                  placeholder={isLogin ? "أدخل رمز PIN" : "مثال: 1234"}
+                  placeholder="أدخل رمز PIN"
                   maxLength={6}
                 />
                 <Button
@@ -229,24 +125,6 @@ const Auth = () => {
                 </Button>
               </div>
             </div>
-
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="confirmPin" className="arabic-text font-semibold">تأكيد رمز PIN</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPin"
-                    type={showPin ? 'text' : 'password'}
-                    value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                    required
-                    className="h-12 text-lg border-2 border-slate-300 focus:border-blue-500 rounded-xl"
-                    placeholder="أعد إدخال رمز PIN"
-                    maxLength={6}
-                  />
-                </div>
-              </div>
-            )}
             
             <Button 
               type="submit" 
@@ -256,22 +134,17 @@ const Auth = () => {
               {loading ? (
                 <>
                   <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-                  {isLogin ? 'جاري تسجيل الدخول...' : 'جاري إنشاء الحساب...'}
+                  جاري تسجيل الدخول...
                 </>
               ) : (
-                isLogin ? 'تسجيل الدخول' : 'إنشاء حساب'
+                'تسجيل الدخول'
               )}
             </Button>
             
-            <div className="text-center">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setIsLogin(!isLogin)}
-                className="arabic-text text-blue-600 hover:text-blue-800"
-              >
-                {isLogin ? 'ليس لديك حساب؟ سجل الآن' : 'لديك حساب؟ سجل دخولك'}
-              </Button>
+            <div className="text-center mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="arabic-text text-blue-800 text-sm font-medium">
+                للحصول على حساب جديد، يرجى التواصل مع الإدارة
+              </p>
             </div>
           </form>
         </CardContent>
