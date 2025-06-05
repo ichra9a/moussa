@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,8 @@ const Auth = () => {
           return;
         }
 
+        console.log('Attempting login with PIN:', pinCode);
+
         // Try to find user in students table first
         const { data: student, error: studentError } = await supabase
           .from('students')
@@ -39,8 +42,11 @@ const Auth = () => {
           .eq('pin_code', pinCode)
           .maybeSingle();
 
+        console.log('Student lookup result:', { student, studentError });
+
         if (student) {
           localStorage.setItem('student', JSON.stringify(student));
+          console.log('Student logged in successfully:', student);
           navigate('/dashboard');
           return;
         }
@@ -52,8 +58,11 @@ const Auth = () => {
           .eq('pin_code', pinCode)
           .maybeSingle();
 
+        console.log('Coach lookup result:', { coach, coachError });
+
         if (coach) {
           localStorage.setItem('coach', JSON.stringify(coach));
+          console.log('Coach logged in successfully:', coach);
           navigate('/coach-dashboard');
           return;
         }
@@ -71,11 +80,15 @@ const Auth = () => {
           return;
         }
 
+        console.log('Attempting registration for:', userType, 'with PIN:', pinCode);
+
         // Check if PIN already exists in both tables
         const [studentCheck, coachCheck] = await Promise.all([
           supabase.from('students').select('id').eq('pin_code', pinCode).maybeSingle(),
           supabase.from('coaches').select('id').eq('pin_code', pinCode).maybeSingle()
         ]);
+
+        console.log('PIN check results:', { studentCheck, coachCheck });
 
         if (studentCheck.data || coachCheck.data) {
           setError('رمز PIN مستخدم بالفعل، يرجى اختيار رمز آخر');
@@ -83,7 +96,9 @@ const Auth = () => {
         }
 
         if (userType === 'student') {
-          // Create new student - direct insert approach
+          console.log('Creating new student...');
+          
+          // Create new student
           const { data: studentData, error: insertError } = await supabase
             .from('students')
             .insert({
@@ -96,17 +111,22 @@ const Auth = () => {
             .select()
             .single();
 
+          console.log('Student creation result:', { studentData, insertError });
+
           if (insertError) {
             console.error('Student registration error:', insertError);
             setError('حدث خطأ أثناء إنشاء الحساب، يرجى المحاولة مرة أخرى');
             return;
           }
 
+          console.log('Student created successfully, storing in localStorage and navigating...');
           localStorage.setItem('student', JSON.stringify(studentData));
           navigate('/dashboard');
         } else {
-          // Create new coach - same PIN-only approach as students
-          const { data, error } = await supabase
+          console.log('Creating new coach...');
+          
+          // Create new coach
+          const { data: coachData, error: insertError } = await supabase
             .from('coaches')
             .insert({
               pin_code: pinCode,
@@ -116,13 +136,16 @@ const Auth = () => {
             .select()
             .single();
 
-          if (error) {
-            console.error('Coach registration error:', error);
+          console.log('Coach creation result:', { coachData, insertError });
+
+          if (insertError) {
+            console.error('Coach registration error:', insertError);
             setError('حدث خطأ أثناء إنشاء حساب المدرب');
             return;
           }
 
-          localStorage.setItem('coach', JSON.stringify(data));
+          console.log('Coach created successfully, storing in localStorage and navigating...');
+          localStorage.setItem('coach', JSON.stringify(coachData));
           navigate('/coach-dashboard');
         }
       }
