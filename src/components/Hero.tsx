@@ -1,16 +1,81 @@
 
+import { useState, useEffect } from 'react';
 import { Play } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HeroProps {
   onVideoSelect: (video: any) => void;
 }
 
 const Hero = ({ onVideoSelect }: HeroProps) => {
+  const [content, setContent] = useState({
+    title: 'طوّر من إمكاناتك',
+    subtitle: 'محتوى تدريبي احترافي مصمم لمساعدتك على تجاوز التحديات، بناء الثقة، وتحقيق أهدافك الشخصية والمهنية.',
+    videoTitle: 'مرحباً بكم في رحلة التطوير الشخصي',
+    videoDescription: 'اكتشف كيفية إطلاق إمكاناتك وتحقيق أهدافك من خلال استراتيجيات التدريب المؤكدة.',
+    videoThumbnail: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=800&h=450&fit=crop',
+    primaryButton: 'شاهد المقدمة',
+    secondaryButton: 'استكشف الفئات',
+    stats: {
+      videos: '50+',
+      videosLabel: 'درس فيديو',
+      categories: '10+',
+      categoriesLabel: 'فئة',
+      students: '1000+',
+      studentsLabel: 'طالب'
+    }
+  });
+
+  useEffect(() => {
+    fetchContent();
+  }, []);
+
+  const fetchContent = async () => {
+    try {
+      const { data } = await supabase
+        .from('website_settings')
+        .select('setting_key, setting_value')
+        .in('setting_key', [
+          'hero_title', 'hero_subtitle', 'hero_video_title', 'hero_video_description',
+          'hero_video_thumbnail', 'hero_primary_button', 'hero_secondary_button',
+          'stats_videos', 'stats_videos_label', 'stats_categories', 'stats_categories_label',
+          'stats_students', 'stats_students_label'
+        ]);
+
+      if (data) {
+        const settings: Record<string, any> = {};
+        data.forEach((setting: any) => {
+          settings[setting.setting_key] = setting.setting_value?.value || setting.setting_value;
+        });
+
+        setContent({
+          title: settings.hero_title || content.title,
+          subtitle: settings.hero_subtitle || content.subtitle,
+          videoTitle: settings.hero_video_title || content.videoTitle,
+          videoDescription: settings.hero_video_description || content.videoDescription,
+          videoThumbnail: settings.hero_video_thumbnail || content.videoThumbnail,
+          primaryButton: settings.hero_primary_button || content.primaryButton,
+          secondaryButton: settings.hero_secondary_button || content.secondaryButton,
+          stats: {
+            videos: settings.stats_videos || content.stats.videos,
+            videosLabel: settings.stats_videos_label || content.stats.videosLabel,
+            categories: settings.stats_categories || content.stats.categories,
+            categoriesLabel: settings.stats_categories_label || content.stats.categoriesLabel,
+            students: settings.stats_students || content.stats.students,
+            studentsLabel: settings.stats_students_label || content.stats.studentsLabel
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching hero content:', error);
+    }
+  };
+
   const featuredVideo = {
     id: 'dQw4w9WgXcQ',
-    title: 'مرحباً بكم في رحلة التطوير الشخصي',
-    description: 'اكتشف كيفية إطلاق إمكاناتك وتحقيق أهدافك من خلال استراتيجيات التدريب المؤكدة.',
-    thumbnail: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=800&h=450&fit=crop'
+    title: content.videoTitle,
+    description: content.videoDescription,
+    thumbnail: content.videoThumbnail
   };
 
   return (
@@ -21,12 +86,11 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
           <div className="space-y-8 text-right">
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight arabic-heading">
-                طوّر من
-                <span className="block text-blue-600">إمكاناتك</span>
+                {content.title.split(' ').slice(0, -1).join(' ')}
+                <span className="block text-blue-600">{content.title.split(' ').slice(-1)}</span>
               </h1>
               <p className="text-xl text-slate-600 leading-relaxed arabic-text">
-                محتوى تدريبي احترافي مصمم لمساعدتك على تجاوز التحديات، 
-                بناء الثقة، وتحقيق أهدافك الشخصية والمهنية.
+                {content.subtitle}
               </p>
             </div>
             
@@ -36,25 +100,25 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
                 className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2 arabic-text"
               >
                 <Play size={20} />
-                شاهد المقدمة
+                {content.primaryButton}
               </button>
               <button className="border border-slate-300 text-slate-700 px-8 py-3 rounded-lg font-semibold hover:bg-slate-50 transition-colors duration-200 arabic-text">
-                استكشف الفئات
+                {content.secondaryButton}
               </button>
             </div>
 
             <div className="flex items-center gap-8 text-sm text-slate-500">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-900">50+</span>
-                <span className="arabic-text">درس فيديو</span>
+                <span className="font-semibold text-slate-900">{content.stats.videos}</span>
+                <span className="arabic-text">{content.stats.videosLabel}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-900">10+</span>
-                <span className="arabic-text">فئة</span>
+                <span className="font-semibold text-slate-900">{content.stats.categories}</span>
+                <span className="arabic-text">{content.stats.categoriesLabel}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-slate-900">1000+</span>
-                <span className="arabic-text">طالب</span>
+                <span className="font-semibold text-slate-900">{content.stats.students}</span>
+                <span className="arabic-text">{content.stats.studentsLabel}</span>
               </div>
             </div>
           </div>
