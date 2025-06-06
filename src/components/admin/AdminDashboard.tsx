@@ -36,6 +36,9 @@ interface Video {
     id: string;
     name: string;
     description: string | null;
+    thumbnail: string | null;
+    created_at: string;
+    updated_at: string;
   };
 }
 
@@ -79,7 +82,10 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
         categories (
           id,
           name,
-          description
+          description,
+          thumbnail,
+          created_at,
+          updated_at
         )
       `)
       .order('created_at', { ascending: false });
