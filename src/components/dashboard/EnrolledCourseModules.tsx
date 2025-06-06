@@ -65,7 +65,7 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
 
       const courseIds = enrollments.map(e => e.course_id);
 
-      // Get modules for enrolled courses with explicit column naming
+      // Get modules for enrolled courses with proper join syntax
       const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select(`
@@ -77,15 +77,6 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
           courses!modules_course_id_fkey(
             id,
             title
-          ),
-          module_videos(
-            video:videos(
-              id,
-              title,
-              duration_seconds,
-              youtube_id,
-              thumbnail
-            )
           )
         `)
         .in('course_id', courseIds)
@@ -98,13 +89,48 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
       }
 
       if (modulesData) {
+        // Get module videos separately to avoid complex joins
+        const moduleIds = modulesData.map(m => m.id);
+        
+        const { data: moduleVideosData, error: videosError } = await supabase
+          .from('module_videos')
+          .select(`
+            module_id,
+            videos!module_videos_video_id_fkey(
+              id,
+              title,
+              duration_seconds,
+              youtube_id,
+              thumbnail
+            )
+          `)
+          .in('module_id', moduleIds)
+          .order('order_index');
+
+        if (videosError) {
+          console.error('Error fetching module videos:', videosError);
+        }
+
+        // Combine modules with their videos
         const formattedModules = modulesData.map(module => ({
           ...module,
           course: {
             id: module.courses?.id || '',
             title: module.courses?.title || ''
-          }
+          },
+          module_videos: moduleVideosData
+            ?.filter(mv => mv.module_id === module.id)
+            ?.map(mv => ({
+              video: {
+                id: mv.videos?.id || '',
+                title: mv.videos?.title || '',
+                duration_seconds: mv.videos?.duration_seconds || 0,
+                youtube_id: mv.videos?.youtube_id || '',
+                thumbnail: mv.videos?.thumbnail
+              }
+            })) || []
         }));
+
         setModules(formattedModules);
       }
     } catch (error) {

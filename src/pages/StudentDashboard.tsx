@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -125,7 +124,7 @@ const StudentDashboard = () => {
               averageProgress={stats.averageProgress}
             />
             <EnrolledCourseModules onVideoSelect={setSelectedVideo} />
-            <ModuleVideos onVideoSelect={setSelectedVideo} />
+            <ModuleVideos />
             <StudentProgress subscriptions={subscriptions} />
           </div>
           
