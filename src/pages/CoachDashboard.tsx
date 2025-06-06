@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,7 +65,7 @@ const CoachDashboard = () => {
             course_id,
             order_index,
             is_active,
-            courses (
+            courses!fk_modules_course (
               id,
               title,
               description,
@@ -84,9 +83,9 @@ const CoachDashboard = () => {
         .eq('is_active', true);
 
       if (subscriptionsData) {
-        // Filter out any subscriptions where students or modules failed to load
+        // Filter out any subscriptions where students, modules, or courses failed to load
         const validSubscriptions = subscriptionsData.filter(sub => 
-          sub.students !== null && sub.modules !== null
+          sub.students !== null && sub.modules !== null && sub.modules.courses !== null
         );
         setSubscriptions(validSubscriptions);
       }
