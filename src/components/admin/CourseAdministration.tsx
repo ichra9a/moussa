@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Plus, Users, BookOpen, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import StudentManagement from './StudentManagement';
-import ModuleManagement from './ModuleManagement';
 import NotificationManagement from './NotificationManagement';
 import CourseList from './CourseList';
 import CourseForm from './CourseForm';
@@ -346,9 +344,8 @@ const CourseAdministration = () => {
   return (
     <div className="space-y-8 font-cairo" dir="rtl">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="courses" className="arabic-text">الدورات</TabsTrigger>
-          <TabsTrigger value="modules" className="arabic-text">المودولات</TabsTrigger>
           <TabsTrigger value="students" className="arabic-text">الطلاب</TabsTrigger>
           <TabsTrigger value="notifications" className="arabic-text">الإشعارات</TabsTrigger>
         </TabsList>
@@ -484,10 +481,6 @@ const CourseAdministration = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="modules" className="mt-6">
-          <ModuleManagement courses={courses} />
         </TabsContent>
 
         <TabsContent value="students" className="mt-6">

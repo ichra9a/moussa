@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Video, Eye, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, Video, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -71,6 +71,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   });
   const [selectedVideo, setSelectedVideo] = useState('');
   const [videoOrderIndex, setVideoOrderIndex] = useState(1);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchModules();
@@ -141,6 +142,15 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.title.trim() || !formData.course_id) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       if (editingModule) {
         const { error } = await supabase
@@ -166,7 +176,8 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
             title: formData.title,
             description: formData.description,
             course_id: formData.course_id,
-            order_index: formData.order_index
+            order_index: formData.order_index,
+            is_active: true
           });
 
         if (error) throw error;
@@ -179,6 +190,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
 
       setFormData({ title: '', description: '', course_id: '', order_index: 1 });
       setEditingModule(null);
+      setIsDialogOpen(false);
       fetchModules();
     } catch (error) {
       console.error('Error saving module:', error);
@@ -289,9 +301,16 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
     <div className="space-y-6" dir="rtl">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold arabic-heading">إدارة الوحدات</h2>
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="arabic-text">
+            <Button 
+              className="arabic-text"
+              onClick={() => {
+                setEditingModule(null);
+                setFormData({ title: '', description: '', course_id: '', order_index: 1 });
+                setIsDialogOpen(true);
+              }}
+            >
               <Plus className="ml-2 h-4 w-4" />
               إضافة وحدة جديدة
             </Button>
@@ -304,7 +323,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">العنوان</label>
+                <label className="block text-sm font-medium mb-2 arabic-text">العنوان *</label>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -321,8 +340,12 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">الدورة</label>
-                <Select value={formData.course_id} onValueChange={(value) => setFormData({ ...formData, course_id: value })}>
+                <label className="block text-sm font-medium mb-2 arabic-text">الدورة *</label>
+                <Select 
+                  value={formData.course_id} 
+                  onValueChange={(value) => setFormData({ ...formData, course_id: value })}
+                  required
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الدورة" />
                   </SelectTrigger>
@@ -340,7 +363,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                 <Input
                   type="number"
                   value={formData.order_index}
-                  onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 1 })}
                   min="1"
                   required
                 />
@@ -354,7 +377,9 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
       </div>
 
       <div className="grid gap-6">
-        {modules.map((module) => (
+        {modules
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((module) => (
           <Card key={module.id}>
             <CardHeader>
               <div className="flex justify-between items-start">
@@ -382,6 +407,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                         course_id: module.course_id,
                         order_index: module.order_index
                       });
+                      setIsDialogOpen(true);
                     }}
                   >
                     <Edit className="h-4 w-4" />
@@ -421,13 +447,6 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => window.open(`/admin`, '_blank')}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
