@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Clock, CheckCircle, PlayCircle } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle } from 'lucide-react';
 
 interface Module {
   id: string;
@@ -22,6 +22,7 @@ interface Module {
       title: string;
       duration_seconds: number;
       youtube_id: string;
+      thumbnail?: string;
     };
   }>;
 }
@@ -64,7 +65,7 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
 
       const courseIds = enrollments.map(e => e.course_id);
 
-      // Get modules for enrolled courses
+      // Get modules for enrolled courses with explicit column naming
       const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select(`
@@ -73,7 +74,7 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
           description,
           order_index,
           course_id,
-          courses!inner(
+          courses!modules_course_id_fkey(
             id,
             title
           ),
@@ -99,7 +100,10 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
       if (modulesData) {
         const formattedModules = modulesData.map(module => ({
           ...module,
-          course: module.courses
+          course: {
+            id: module.courses?.id || '',
+            title: module.courses?.title || ''
+          }
         }));
         setModules(formattedModules);
       }
@@ -210,7 +214,7 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
                         onClick={() => onVideoSelect({
                           id: moduleVideo.video.youtube_id,
                           title: moduleVideo.video.title,
-                          thumbnail: moduleVideo.video.thumbnail
+                          thumbnail: moduleVideo.video.thumbnail || ''
                         })}
                         className="arabic-text"
                       >

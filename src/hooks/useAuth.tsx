@@ -26,6 +26,7 @@ interface AuthContextType {
   coach: Coach | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -102,8 +103,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setCoach(null);
   };
 
+  const logout = async () => {
+    await signOut();
+  };
+
   return (
-    <AuthContext.Provider value={{ student, coach, loading, signOut }}>
+    <AuthContext.Provider value={{ student, coach, loading, signOut, logout }}>
       {children}
     </AuthContext.Provider>
   );

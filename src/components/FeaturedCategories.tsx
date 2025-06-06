@@ -53,7 +53,7 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
         return;
       }
 
-      // Then get videos that are linked to categories but NOT linked to any modules
+      // Then get videos that are linked to categories but NOT linked to any modules or courses
       const { data: videosData, error: videosError } = await supabase
         .from('videos')
         .select(`
@@ -73,9 +73,6 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
           )
         `)
         .not('category_id', 'is', null)
-        .not('id', 'in', `(
-          SELECT video_id FROM module_videos
-        )`)
         .order('created_at', { ascending: false });
 
       if (videosError) {
@@ -83,10 +80,27 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
         return;
       }
 
+      // Get videos that are linked to modules to exclude them
+      const { data: moduleVideos, error: moduleVideosError } = await supabase
+        .from('module_videos')
+        .select('video_id');
+
+      if (moduleVideosError) {
+        console.error('Error fetching module videos:', moduleVideosError);
+        return;
+      }
+
+      const moduleVideoIds = moduleVideos?.map(mv => mv.video_id) || [];
+
+      // Filter out videos that are linked to modules
+      const filteredVideos = videosData?.filter(video => 
+        !moduleVideoIds.includes(video.id)
+      ) || [];
+
       // Group videos by category
       const categoriesWithVideos = categoriesData?.map(category => ({
         ...category,
-        videos: videosData?.filter(video => video.category_id === category.id)
+        videos: filteredVideos.filter(video => video.category_id === category.id)
           .map(video => ({
             ...video,
             category: video.categories
@@ -102,6 +116,12 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   const filteredCategories = categories.map(category => ({
@@ -176,8 +196,21 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
                 {category.videos.slice(0, 6).map((video) => (
                   <VideoCard
                     key={video.id}
-                    video={video}
-                    onVideoSelect={onVideoSelect}
+                    video={{
+                      title: video.title,
+                      description: video.description || '',
+                      category: video.category.name,
+                      thumbnail: video.thumbnail || '',
+                      duration: formatDuration(video.duration_seconds || 0),
+                      youtube_url: video.youtube_url,
+                      youtube_id: video.youtube_id,
+                      views: video.views
+                    }}
+                    onSelect={() => onVideoSelect({
+                      id: video.youtube_id,
+                      title: video.title,
+                      thumbnail: video.thumbnail
+                    })}
                   />
                 ))}
               </div>
