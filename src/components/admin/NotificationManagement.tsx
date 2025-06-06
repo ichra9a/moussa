@@ -40,12 +40,22 @@ const NotificationManagement = () => {
   }, []);
 
   const fetchStudents = async () => {
-    const { data } = await supabase
-      .from('students')
-      .select('*')
-      .order('full_name');
-    
-    if (data) setStudents(data);
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('full_name');
+      
+      if (error) throw error;
+      if (data) setStudents(data);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء جلب قائمة الطلاب",
+        variant: "destructive"
+      });
+    }
   };
 
   const sendGlobalNotification = async () => {
@@ -60,7 +70,7 @@ const NotificationManagement = () => {
 
     setLoading(true);
     try {
-      // Send global notification
+      // Send global notification first
       const { error: globalError } = await supabase
         .from('global_notifications')
         .insert({
@@ -69,25 +79,43 @@ const NotificationManagement = () => {
           type: globalNotification.type
         });
 
-      if (globalError) throw globalError;
+      if (globalError) {
+        console.error('Global notification error:', globalError);
+        throw globalError;
+      }
 
-      // Send individual notifications to all students
-      const studentNotifications = students.map(student => ({
-        student_id: student.id,
-        title: globalNotification.title,
-        message: globalNotification.message,
-        type: globalNotification.type
-      }));
+      // Send individual notifications to all students in batches
+      if (students.length > 0) {
+        const batchSize = 50; // Process in smaller batches to avoid timeout
+        const batches = [];
+        
+        for (let i = 0; i < students.length; i += batchSize) {
+          batches.push(students.slice(i, i + batchSize));
+        }
 
-      const { error: individualError } = await supabase
-        .from('notifications')
-        .insert(studentNotifications);
+        for (const batch of batches) {
+          const studentNotifications = batch.map(student => ({
+            student_id: student.id,
+            title: globalNotification.title,
+            message: globalNotification.message,
+            type: globalNotification.type,
+            is_read: false
+          }));
 
-      if (individualError) throw individualError;
+          const { error: batchError } = await supabase
+            .from('notifications')
+            .insert(studentNotifications);
+
+          if (batchError) {
+            console.error('Batch notification error:', batchError);
+            throw batchError;
+          }
+        }
+      }
 
       toast({
         title: "تم الإرسال بنجاح",
-        description: `تم إرسال الإشعار إلى ${students.length} طالب`
+        description: `تم إرسال الإشعار العام و ${students.length} إشعار شخصي`
       });
 
       setGlobalNotification({ title: '', message: '', type: 'info' });
@@ -95,7 +123,7 @@ const NotificationManagement = () => {
       console.error('Error sending global notification:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء إرسال الإشعار",
+        description: "حدث خطأ أثناء إرسال الإشعار العام",
         variant: "destructive"
       });
     } finally {
@@ -121,14 +149,19 @@ const NotificationManagement = () => {
           student_id: selectedStudent,
           title: personalNotification.title,
           message: personalNotification.message,
-          type: personalNotification.type
+          type: personalNotification.type,
+          is_read: false
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Personal notification error:', error);
+        throw error;
+      }
 
+      const selectedStudentData = students.find(s => s.id === selectedStudent);
       toast({
         title: "تم الإرسال بنجاح",
-        description: "تم إرسال الإشعار للطالب المحدد"
+        description: `تم إرسال الإشعار إلى ${selectedStudentData?.full_name || 'الطالب المحدد'}`
       });
 
       setPersonalNotification({ title: '', message: '', type: 'info' });
@@ -137,7 +170,7 @@ const NotificationManagement = () => {
       console.error('Error sending personal notification:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء إرسال الإشعار",
+        description: "حدث خطأ أثناء إرسال الإشعار الشخصي",
         variant: "destructive"
       });
     } finally {
@@ -176,6 +209,7 @@ const NotificationManagement = () => {
                     onChange={(e) => setGlobalNotification({ ...globalNotification, title: e.target.value })}
                     placeholder="أدخل عنوان الإشعار"
                     className="arabic-text"
+                    dir="rtl"
                   />
                 </div>
                 
@@ -205,6 +239,7 @@ const NotificationManagement = () => {
                     placeholder="أدخل نص الإشعار"
                     className="arabic-text"
                     rows={4}
+                    dir="rtl"
                   />
                 </div>
 
@@ -220,11 +255,11 @@ const NotificationManagement = () => {
 
                 <Button 
                   onClick={sendGlobalNotification} 
-                  disabled={loading}
+                  disabled={loading || !globalNotification.title.trim() || !globalNotification.message.trim()}
                   className="w-full arabic-text"
                 >
                   <Send className="ml-2 h-4 w-4" />
-                  إرسال الإشعار لجميع الطلاب
+                  {loading ? 'جاري الإرسال...' : 'إرسال الإشعار لجميع الطلاب'}
                 </Button>
               </div>
             </TabsContent>
@@ -254,6 +289,7 @@ const NotificationManagement = () => {
                     onChange={(e) => setPersonalNotification({ ...personalNotification, title: e.target.value })}
                     placeholder="أدخل عنوان الإشعار"
                     className="arabic-text"
+                    dir="rtl"
                   />
                 </div>
 
@@ -283,16 +319,17 @@ const NotificationManagement = () => {
                     placeholder="أدخل نص الإشعار"
                     className="arabic-text"
                     rows={4}
+                    dir="rtl"
                   />
                 </div>
 
                 <Button 
                   onClick={sendPersonalNotification} 
-                  disabled={loading}
+                  disabled={loading || !personalNotification.title.trim() || !personalNotification.message.trim() || !selectedStudent}
                   className="w-full arabic-text"
                 >
                   <Send className="ml-2 h-4 w-4" />
-                  إرسال الإشعار للطالب المحدد
+                  {loading ? 'جاري الإرسال...' : 'إرسال الإشعار للطالب المحدد'}
                 </Button>
               </div>
             </TabsContent>

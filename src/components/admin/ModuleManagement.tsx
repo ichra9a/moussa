@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Video, Save, X, Trash2 } from 'lucide-react';
+import { Plus, Video, Save, X, Trash2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Module {
@@ -42,8 +42,15 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
   const [selectedCourse, setSelectedCourse] = useState<string>('all');
   const [showCreateModule, setShowCreateModule] = useState(false);
   const [showAddVideo, setShowAddVideo] = useState<string | null>(null);
+  const [editingModule, setEditingModule] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [newModule, setNewModule] = useState({
+    title: '',
+    description: '',
+    course_id: ''
+  });
+  const [editModule, setEditModule] = useState({
+    id: '',
     title: '',
     description: '',
     course_id: ''
@@ -60,19 +67,34 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
   }, [selectedCourse]);
 
   const fetchModules = async () => {
-    const query = supabase.from('modules').select('*').order('order_index');
-    
-    if (selectedCourse && selectedCourse !== 'all') {
-      query.eq('course_id', selectedCourse);
+    try {
+      const query = supabase.from('modules').select('*').order('order_index');
+      
+      if (selectedCourse && selectedCourse !== 'all') {
+        query.eq('course_id', selectedCourse);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data) setModules(data);
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء جلب المودولات",
+        variant: "destructive"
+      });
     }
-    
-    const { data } = await query;
-    if (data) setModules(data);
   };
 
   const fetchVideos = async () => {
-    const { data } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
-    if (data) setVideos(data);
+    try {
+      const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      if (data) setVideos(data);
+    } catch (error) {
+      console.error('Error fetching videos:', error);
+    }
   };
 
   const extractYouTubeId = (url: string) => {
@@ -124,6 +146,49 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
     }
   };
 
+  const handleUpdateModule = async () => {
+    if (!editModule.title.trim()) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال عنوان المودول",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('modules')
+        .update({
+          title: editModule.title,
+          description: editModule.description,
+          course_id: editModule.course_id
+        })
+        .eq('id', editModule.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث المودول بنجاح"
+      });
+
+      setEditingModule(null);
+      setEditModule({ id: '', title: '', description: '', course_id: '' });
+      fetchModules();
+    } catch (error) {
+      console.error('Error updating module:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تحديث المودول",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAddVideoToModule = async (moduleId: string) => {
     if (!newVideo.title.trim() || !newVideo.youtube_url.trim()) {
       toast({
@@ -160,13 +225,19 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
 
       if (videoError) throw videoError;
 
+      // Get the current count of videos in this module
+      const { count } = await supabase
+        .from('module_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('module_id', moduleId);
+
       // Then link it to the module
       const { error: linkError } = await supabase
         .from('module_videos')
         .insert({
           module_id: moduleId,
           video_id: videoData.id,
-          order_index: 0
+          order_index: count || 0
         });
 
       if (linkError) throw linkError;
@@ -219,6 +290,16 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const startEditingModule = (module: Module) => {
+    setEditModule({
+      id: module.id,
+      title: module.title,
+      description: module.description,
+      course_id: module.course_id
+    });
+    setEditingModule(module.id);
   };
 
   return (
@@ -333,76 +414,142 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
             ) : (
               modules.map((module) => (
                 <div key={module.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold arabic-text">{module.title}</h3>
-                      <p className="text-sm text-gray-600 arabic-text">{module.description}</p>
-                      <Badge variant={module.is_active ? "default" : "secondary"} className="mt-1">
-                        {module.is_active ? 'نشط' : 'غير نشط'}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => setShowAddVideo(showAddVideo === module.id ? null : module.id)}
-                        className="arabic-text"
-                      >
-                        <Video className="h-4 w-4 ml-1" />
-                        إضافة فيديو
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteModule(module.id)}
-                        className="arabic-text"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {showAddVideo === module.id && (
-                    <div className="border-t pt-3 space-y-3 bg-blue-50 p-3 rounded">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {editingModule === module.id ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label className="arabic-text">عنوان الفيديو</Label>
+                          <Label className="arabic-text">عنوان المودول</Label>
                           <Input
-                            value={newVideo.title}
-                            onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
-                            placeholder="أدخل عنوان الفيديو"
+                            value={editModule.title}
+                            onChange={(e) => setEditModule({ ...editModule, title: e.target.value })}
+                            placeholder="أدخل عنوان المودول"
                             className="arabic-text"
                           />
                         </div>
                         <div>
-                          <Label className="arabic-text">رابط اليوتيوب</Label>
-                          <Input
-                            value={newVideo.youtube_url}
-                            onChange={(e) => setNewVideo({ ...newVideo, youtube_url: e.target.value })}
-                            placeholder="https://www.youtube.com/watch?v=..."
-                            className="arabic-text"
-                          />
+                          <Label className="arabic-text">الدورة</Label>
+                          <Select value={editModule.course_id} onValueChange={(value) => setEditModule({ ...editModule, course_id: value })}>
+                            <SelectTrigger className="arabic-text">
+                              <SelectValue placeholder="اختر الدورة" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
+                                <SelectItem key={course.id} value={course.id}>
+                                  {course.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddVideoToModule(module.id)} 
-                          disabled={loading}
+                      <div>
+                        <Label className="arabic-text">وصف المودول</Label>
+                        <Textarea
+                          value={editModule.description}
+                          onChange={(e) => setEditModule({ ...editModule, description: e.target.value })}
+                          placeholder="أدخل وصف المودول"
                           className="arabic-text"
-                        >
-                          <Save className="ml-1 h-4 w-4" />
-                          إضافة الفيديو
+                          rows={3}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={handleUpdateModule} disabled={loading} className="arabic-text">
+                          <Save className="ml-2 h-4 w-4" />
+                          حفظ التغييرات
                         </Button>
                         <Button 
-                          size="sm" 
                           variant="outline" 
-                          onClick={() => setShowAddVideo(null)}
+                          onClick={() => setEditingModule(null)}
                           className="arabic-text"
                         >
+                          <X className="ml-2 h-4 w-4" />
                           إلغاء
                         </Button>
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold arabic-text">{module.title}</h3>
+                          <p className="text-sm text-gray-600 arabic-text">{module.description}</p>
+                          <Badge variant={module.is_active ? "default" : "secondary"} className="mt-1">
+                            {module.is_active ? 'نشط' : 'غير نشط'}
+                          </Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => startEditingModule(module)}
+                            className="arabic-text"
+                          >
+                            <Edit className="h-4 w-4 ml-1" />
+                            تعديل
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => setShowAddVideo(showAddVideo === module.id ? null : module.id)}
+                            className="arabic-text"
+                          >
+                            <Video className="h-4 w-4 ml-1" />
+                            إضافة فيديو
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteModule(module.id)}
+                            className="arabic-text"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {showAddVideo === module.id && (
+                        <div className="border-t pt-3 space-y-3 bg-blue-50 p-3 rounded">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="arabic-text">عنوان الفيديو</Label>
+                              <Input
+                                value={newVideo.title}
+                                onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
+                                placeholder="أدخل عنوان الفيديو"
+                                className="arabic-text"
+                              />
+                            </div>
+                            <div>
+                              <Label className="arabic-text">رابط اليوتيوب</Label>
+                              <Input
+                                value={newVideo.youtube_url}
+                                onChange={(e) => setNewVideo({ ...newVideo, youtube_url: e.target.value })}
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                className="arabic-text"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleAddVideoToModule(module.id)} 
+                              disabled={loading}
+                              className="arabic-text"
+                            >
+                              <Save className="ml-1 h-4 w-4" />
+                              إضافة الفيديو
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setShowAddVideo(null)}
+                              className="arabic-text"
+                            >
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))

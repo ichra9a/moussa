@@ -2,98 +2,94 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Save, X, Users } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { User, Save, X } from 'lucide-react';
+
+interface Student {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  pin_code: string;
+}
 
 interface StudentFormProps {
+  student?: Student | null;
   onStudentCreated: () => void;
   onCancel: () => void;
 }
 
-const StudentForm = ({ onStudentCreated, onCancel }: StudentFormProps) => {
-  const [loading, setLoading] = useState(false);
-  const [generatedPin, setGeneratedPin] = useState<string>('');
+const StudentForm = ({ student, onStudentCreated, onCancel }: StudentFormProps) => {
   const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone: ''
+    full_name: student?.full_name || '',
+    email: student?.email || '',
+    phone: student?.phone || ''
   });
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  const handleGeneratePin = async () => {
-    try {
-      const { data, error } = await supabase.rpc('generate_unique_pin');
-      
-      if (error) throw error;
-      
-      setGeneratedPin(data);
-      toast({
-        title: "تم إنشاء PIN",
-        description: `تم إنشاء رمز PIN: ${data}`,
-      });
-    } catch (error) {
-      console.error('Error generating PIN:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إنشاء رمز PIN",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.full_name.trim() || !formData.email.trim() || !generatedPin) {
+    if (!formData.full_name.trim() || !formData.email.trim()) {
       toast({
         title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة وإنشاء رمز PIN",
+        description: "يرجى إدخال الاسم والبريد الإلكتروني",
         variant: "destructive"
       });
       return;
     }
 
     setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('students')
-        .insert({
-          full_name: formData.full_name,
-          email: formData.email,
-          phone: formData.phone || null,
-          pin_code: generatedPin
-        });
 
-      if (error) {
-        if (error.code === '23505') {
-          toast({
-            title: "خطأ",
-            description: "البريد الإلكتروني مستخدم بالفعل أو رمز PIN موجود",
-            variant: "destructive"
+    try {
+      if (student) {
+        // Update existing student
+        const { error } = await supabase
+          .from('students')
+          .update({
+            full_name: formData.full_name,
+            email: formData.email,
+            phone: formData.phone || null
+          })
+          .eq('id', student.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "تم بنجاح",
+          description: "تم تحديث بيانات الطالب بنجاح"
+        });
+      } else {
+        // Create new student
+        const pinCode = await generateUniquePinCode();
+        
+        const { error } = await supabase
+          .from('students')
+          .insert({
+            full_name: formData.full_name,
+            email: formData.email,
+            phone: formData.phone || null,
+            pin_code: pinCode
           });
-        } else {
-          throw error;
-        }
-        return;
+
+        if (error) throw error;
+
+        toast({
+          title: "تم بنجاح",
+          description: `تم إنشاء الطالب بنجاح. رمز الطالب: ${pinCode}`
+        });
       }
 
-      toast({
-        title: "تم بنجاح",
-        description: `تم إنشاء حساب الطالب بنجاح. رمز PIN: ${generatedPin}`
-      });
-
-      setFormData({ full_name: '', email: '', phone: '' });
-      setGeneratedPin('');
       onStudentCreated();
     } catch (error) {
-      console.error('Error creating student:', error);
+      console.error('Error saving student:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء إنشاء حساب الطالب",
+        description: "حدث خطأ أثناء حفظ بيانات الطالب",
         variant: "destructive"
       });
     } finally {
@@ -101,43 +97,62 @@ const StudentForm = ({ onStudentCreated, onCancel }: StudentFormProps) => {
     }
   };
 
+  const generateUniquePinCode = async (): Promise<string> => {
+    let pinCode: string;
+    let isUnique = false;
+
+    do {
+      pinCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      const { data } = await supabase
+        .from('students')
+        .select('pin_code')
+        .eq('pin_code', pinCode)
+        .single();
+      
+      isUnique = !data;
+    } while (!isUnique);
+
+    return pinCode;
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 arabic-heading">
-          <Users className="h-5 w-5" />
-          إنشاء حساب طالب جديد
+          <User className="h-5 w-5" />
+          {student ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="arabic-text">الاسم الكامل</Label>
-              <Input
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                placeholder="أدخل الاسم الكامل"
-                className="arabic-text"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="arabic-text">البريد الإلكتروني</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="أدخل البريد الإلكتروني"
-                className="arabic-text"
-                required
-              />
-            </div>
+          <div>
+            <Label className="arabic-text">الاسم الكامل</Label>
+            <Input
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+              placeholder="أدخل الاسم الكامل"
+              required
+              className="arabic-text"
+            />
           </div>
-
-          <div className="space-y-2">
+          
+          <div>
+            <Label className="arabic-text">البريد الإلكتروني</Label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="أدخل البريد الإلكتروني"
+              required
+              className="arabic-text"
+            />
+          </div>
+          
+          <div>
             <Label className="arabic-text">رقم الهاتف (اختياري)</Label>
             <Input
+              type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               placeholder="أدخل رقم الهاتف"
@@ -145,44 +160,23 @@ const StudentForm = ({ onStudentCreated, onCancel }: StudentFormProps) => {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="arabic-text">رمز PIN (إنشاء تلقائي)</Label>
-            <div className="flex gap-2">
+          {student && (
+            <div>
+              <Label className="arabic-text">رمز الطالب</Label>
               <Input
-                value={generatedPin}
-                readOnly
-                className="arabic-text font-mono"
-                placeholder="سيتم إنشاء رمز تلقائياً"
+                value={student.pin_code}
+                disabled
+                className="arabic-text bg-gray-100"
               />
-              <Button 
-                type="button"
-                onClick={handleGeneratePin}
-                className="arabic-text"
-              >
-                إنشاء رمز
-              </Button>
             </div>
-          </div>
-
-          {generatedPin && (
-            <Alert variant="default" className="bg-blue-50 border-blue-200">
-              <AlertDescription className="arabic-text text-blue-700 font-medium">
-                تم إنشاء رمز PIN: {generatedPin}. يرجى حفظ هذا الرمز لتسليمه للطالب.
-              </AlertDescription>
-            </Alert>
           )}
-
-          <div className="flex gap-2 mt-6">
+          
+          <div className="flex gap-2 pt-4">
             <Button type="submit" disabled={loading} className="arabic-text">
               <Save className="ml-2 h-4 w-4" />
-              {loading ? 'جاري الإنشاء...' : 'إنشاء حساب الطالب'}
+              {loading ? 'جاري الحفظ...' : (student ? 'حفظ التغييرات' : 'إضافة الطالب')}
             </Button>
-            <Button 
-              type="button"
-              variant="outline" 
-              onClick={onCancel}
-              className="arabic-text"
-            >
+            <Button type="button" variant="outline" onClick={onCancel} className="arabic-text">
               <X className="ml-2 h-4 w-4" />
               إلغاء
             </Button>

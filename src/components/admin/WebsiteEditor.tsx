@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Settings, Type, Image, Video, MessageSquare } from 'lucide-react';
+import { Save, Settings, Type, Image, Video, MessageSquare, Globe, Layout } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface WebsiteSetting {
@@ -32,34 +32,81 @@ const WebsiteEditor = () => {
     { key: 'hero_primary_button', value: 'شاهد المقدمة', type: 'text', label: 'نص الزر الرئيسي', category: 'hero' },
     { key: 'hero_secondary_button', value: 'استكشف الفئات', type: 'text', label: 'نص الزر الثانوي', category: 'hero' },
     
+    // Navigation
+    { key: 'nav_home', value: 'الرئيسية', type: 'text', label: 'نص الرئيسية في القائمة', category: 'navigation' },
+    { key: 'nav_courses', value: 'الدورات', type: 'text', label: 'نص الدورات في القائمة', category: 'navigation' },
+    { key: 'nav_about', value: 'من نحن', type: 'text', label: 'نص من نحن في القائمة', category: 'navigation' },
+    { key: 'nav_contact', value: 'تواصل معنا', type: 'text', label: 'نص التواصل في القائمة', category: 'navigation' },
+    { key: 'nav_login', value: 'تسجيل الدخول', type: 'text', label: 'نص تسجيل الدخول', category: 'navigation' },
+    
     // Statistics
-    { key: 'stats_videos', value: '50+', type: 'text', label: 'عدد الدروس', category: 'hero' },
-    { key: 'stats_videos_label', value: 'درس فيديو', type: 'text', label: 'تسمية الدروس', category: 'hero' },
-    { key: 'stats_categories', value: '10+', type: 'text', label: 'عدد الفئات', category: 'hero' },
-    { key: 'stats_categories_label', value: 'فئة', type: 'text', label: 'تسمية الفئات', category: 'hero' },
-    { key: 'stats_students', value: '1000+', type: 'text', label: 'عدد الطلاب', category: 'hero' },
-    { key: 'stats_students_label', value: 'طالب', type: 'text', label: 'تسمية الطلاب', category: 'hero' },
+    { key: 'stats_videos', value: '50+', type: 'text', label: 'عدد الدروس', category: 'statistics' },
+    { key: 'stats_videos_label', value: 'درس فيديو', type: 'text', label: 'تسمية الدروس', category: 'statistics' },
+    { key: 'stats_categories', value: '10+', type: 'text', label: 'عدد الفئات', category: 'statistics' },
+    { key: 'stats_categories_label', value: 'فئة', type: 'text', label: 'تسمية الفئات', category: 'statistics' },
+    { key: 'stats_students', value: '1000+', type: 'text', label: 'عدد الطلاب', category: 'statistics' },
+    { key: 'stats_students_label', value: 'طالب', type: 'text', label: 'تسمية الطلاب', category: 'statistics' },
 
     // About Section
     { key: 'about_title', value: 'من نحن', type: 'text', label: 'عنوان قسم "حولنا"', category: 'about' },
     { key: 'about_description', value: 'نحن منصة تعليمية متطورة تهدف إلى تقديم أفضل المحتويات التعليمية', type: 'textarea', label: 'وصف قسم "حولنا"', category: 'about' },
+    { key: 'about_mission_title', value: 'رؤيتنا', type: 'text', label: 'عنوان الرؤية', category: 'about' },
+    { key: 'about_mission_text', value: 'نسعى لتكون المنصة الرائدة في التعليم الإلكتروني', type: 'textarea', label: 'نص الرؤية', category: 'about' },
+    { key: 'about_values_title', value: 'قيمنا', type: 'text', label: 'عنوان القيم', category: 'about' },
+    { key: 'about_values_text', value: 'الجودة، الابتكار، والتميز في التعليم', type: 'textarea', label: 'نص القيم', category: 'about' },
+
+    // Features Section
+    { key: 'features_title', value: 'ميزاتنا', type: 'text', label: 'عنوان قسم الميزات', category: 'features' },
+    { key: 'features_subtitle', value: 'اكتشف ما يميزنا عن الآخرين', type: 'text', label: 'النص الفرعي للميزات', category: 'features' },
+    { key: 'feature_1_title', value: 'محتوى عالي الجودة', type: 'text', label: 'عنوان الميزة الأولى', category: 'features' },
+    { key: 'feature_1_desc', value: 'دروس مصممة بعناية من خبراء متخصصين', type: 'textarea', label: 'وصف الميزة الأولى', category: 'features' },
+    { key: 'feature_2_title', value: 'تعلم مرن', type: 'text', label: 'عنوان الميزة الثانية', category: 'features' },
+    { key: 'feature_2_desc', value: 'تعلم في أي وقت ومن أي مكان', type: 'textarea', label: 'وصف الميزة الثانية', category: 'features' },
+    { key: 'feature_3_title', value: 'دعم مستمر', type: 'text', label: 'عنوان الميزة الثالثة', category: 'features' },
+    { key: 'feature_3_desc', value: 'فريق دعم متاح لمساعدتك', type: 'textarea', label: 'وصف الميزة الثالثة', category: 'features' },
 
     // Contact Section
     { key: 'contact_title', value: 'تواصل معنا', type: 'text', label: 'عنوان قسم التواصل', category: 'contact' },
     { key: 'contact_description', value: 'نحن هنا لمساعدتك في رحلتك التعليمية', type: 'textarea', label: 'وصف قسم التواصل', category: 'contact' },
     { key: 'contact_email', value: 'info@platform.com', type: 'email', label: 'البريد الإلكتروني للتواصل', category: 'contact' },
     { key: 'contact_phone', value: '+966 50 123 4567', type: 'text', label: 'رقم الهاتف', category: 'contact' },
+    { key: 'contact_address', value: 'الرياض، المملكة العربية السعودية', type: 'text', label: 'العنوان', category: 'contact' },
+    { key: 'contact_form_name', value: 'الاسم', type: 'text', label: 'تسمية حقل الاسم', category: 'contact' },
+    { key: 'contact_form_email', value: 'البريد الإلكتروني', type: 'text', label: 'تسمية حقل البريد', category: 'contact' },
+    { key: 'contact_form_message', value: 'الرسالة', type: 'text', label: 'تسمية حقل الرسالة', category: 'contact' },
+    { key: 'contact_form_submit', value: 'إرسال الرسالة', type: 'text', label: 'نص زر الإرسال', category: 'contact' },
 
     // Footer
     { key: 'footer_about', value: '{"ar": "نحن منصة تعليمية متخصصة في التطوير الشخصي والمهني"}', type: 'json', label: 'نص "حولنا" في الفوتر', category: 'footer' },
     { key: 'footer_contact_email', value: 'info@platform.com', type: 'email', label: 'بريد التواصل في الفوتر', category: 'footer' },
     { key: 'footer_links', value: '[]', type: 'json', label: 'الروابط السريعة', category: 'footer' },
     { key: 'footer_social_links', value: '[]', type: 'json', label: 'روابط التواصل الاجتماعي', category: 'footer' },
+    { key: 'footer_copyright', value: 'جميع الحقوق محفوظة © 2024', type: 'text', label: 'نص حقوق النشر', category: 'footer' },
     { key: 'site_logo', value: '', type: 'text', label: 'شعار الموقع', category: 'footer' },
 
     // Search Section
     { key: 'search_title', value: 'ابحث عن الدروس', type: 'text', label: 'عنوان قسم البحث', category: 'search' },
     { key: 'search_placeholder', value: 'ابحث عن الموضوع الذي تريد تعلمه...', type: 'text', label: 'نص البحث', category: 'search' },
+    { key: 'search_button', value: 'بحث', type: 'text', label: 'نص زر البحث', category: 'search' },
+    { key: 'search_no_results', value: 'لم يتم العثور على نتائج', type: 'text', label: 'رسالة عدم وجود نتائج', category: 'search' },
+
+    // Course Section
+    { key: 'courses_title', value: 'الدورات المتاحة', type: 'text', label: 'عنوان قسم الدورات', category: 'courses' },
+    { key: 'courses_subtitle', value: 'اختر من مجموعة واسعة من الدورات', type: 'text', label: 'النص الفرعي للدورات', category: 'courses' },
+    { key: 'course_view_more', value: 'عرض المزيد', type: 'text', label: 'نص "عرض المزيد"', category: 'courses' },
+    { key: 'course_enroll_now', value: 'سجل الآن', type: 'text', label: 'نص "سجل الآن"', category: 'courses' },
+    { key: 'course_free', value: 'مجاني', type: 'text', label: 'نص "مجاني"', category: 'courses' },
+    { key: 'course_duration', value: 'مدة الدورة', type: 'text', label: 'تسمية مدة الدورة', category: 'courses' },
+    { key: 'course_level', value: 'المستوى', type: 'text', label: 'تسمية المستوى', category: 'courses' },
+
+    // Common Elements
+    { key: 'loading_text', value: 'جاري التحميل...', type: 'text', label: 'نص التحميل', category: 'common' },
+    { key: 'error_text', value: 'حدث خطأ', type: 'text', label: 'نص الخطأ', category: 'common' },
+    { key: 'success_text', value: 'تم بنجاح', type: 'text', label: 'نص النجاح', category: 'common' },
+    { key: 'cancel_text', value: 'إلغاء', type: 'text', label: 'نص الإلغاء', category: 'common' },
+    { key: 'save_text', value: 'حفظ', type: 'text', label: 'نص الحفظ', category: 'common' },
+    { key: 'edit_text', value: 'تعديل', type: 'text', label: 'نص التعديل', category: 'common' },
+    { key: 'delete_text', value: 'حذف', type: 'text', label: 'نص الحذف', category: 'common' },
   ];
 
   useEffect(() => {
@@ -124,7 +171,13 @@ const WebsiteEditor = () => {
           ? { 
               ...setting, 
               setting_value: setting.setting_type === 'json' 
-                ? JSON.parse(newValue || '{}')
+                ? (() => {
+                    try {
+                      return JSON.parse(newValue || '{}');
+                    } catch {
+                      return { value: newValue };
+                    }
+                  })()
                 : { value: newValue }
             }
           : setting
@@ -198,6 +251,7 @@ const WebsiteEditor = () => {
             onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
             className="arabic-text"
             rows={3}
+            dir="rtl"
           />
         );
       case 'email':
@@ -207,6 +261,7 @@ const WebsiteEditor = () => {
             value={value}
             onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
             className="arabic-text"
+            dir="ltr"
           />
         );
       case 'json':
@@ -217,6 +272,7 @@ const WebsiteEditor = () => {
             className="arabic-text font-mono"
             rows={4}
             placeholder='{"ar": "النص باللغة العربية"}'
+            dir="ltr"
           />
         );
       default:
@@ -226,6 +282,7 @@ const WebsiteEditor = () => {
             value={value}
             onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
             className="arabic-text"
+            dir="rtl"
           />
         );
     }
@@ -242,19 +299,29 @@ const WebsiteEditor = () => {
 
   const categoryIcons = {
     hero: Video,
+    navigation: Layout,
+    statistics: Type,
     about: MessageSquare,
+    features: Globe,
     contact: MessageSquare,
     footer: Settings,
     search: Type,
+    courses: Video,
+    common: Settings,
     general: Settings
   };
 
   const categoryTitles = {
-    hero: 'القسم الرئيسي والإحصائيات',
+    hero: 'القسم الرئيسي',
+    navigation: 'شريط التنقل',
+    statistics: 'الإحصائيات',
     about: 'قسم "حولنا"',
+    features: 'قسم الميزات',
     contact: 'قسم التواصل',
     footer: 'الفوتر',
     search: 'قسم البحث',
+    courses: 'قسم الدورات',
+    common: 'العناصر المشتركة',
     general: 'إعدادات عامة'
   };
 
