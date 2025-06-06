@@ -73,9 +73,9 @@ const CourseList = ({ courses, onEditCourse, onDeleteCourse }: CourseListProps) 
                         <Trash2 className="h-4 w-4" />
                         حذف
                       </Button>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
