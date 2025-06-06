@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,10 +47,19 @@ interface Module {
   }>;
 }
 
-const ModuleManagement = () => {
+interface Course {
+  id: string;
+  title: string;
+}
+
+interface ModuleManagementProps {
+  courses: Course[];
+}
+
+const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   const { toast } = useToast();
   const [modules, setModules] = useState<Module[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<Course[]>(propCourses || []);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
@@ -66,9 +74,11 @@ const ModuleManagement = () => {
 
   useEffect(() => {
     fetchModules();
-    fetchCourses();
+    if (!propCourses || propCourses.length === 0) {
+      fetchCourses();
+    }
     fetchVideos();
-  }, []);
+  }, [propCourses]);
 
   const fetchModules = async () => {
     try {
@@ -76,7 +86,7 @@ const ModuleManagement = () => {
         .from('modules')
         .select(`
           *,
-          courses(title),
+          courses!modules_course_id_fkey(title),
           module_videos(
             id,
             order_index,
