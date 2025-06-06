@@ -436,6 +436,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_module_subscriptions_module"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_module_subscriptions_student"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "module_subscriptions_module_id_fkey"
             columns: ["module_id"]
             isOneToOne: false
@@ -474,6 +488,20 @@ export type Database = {
           video_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_module_videos_module"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_module_videos_video"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "module_videos_module_id_fkey"
             columns: ["module_id"]
@@ -522,6 +550,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_modules_course"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "modules_course_id_fkey"
             columns: ["course_id"]
@@ -630,6 +665,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_student_enrollments_course"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_student_enrollments_student"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "student_enrollments_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
@@ -648,6 +697,7 @@ export type Database = {
       student_video_progress: {
         Row: {
           completed_at: string | null
+          completion_percentage: number | null
           created_at: string
           id: string
           student_id: string
@@ -657,6 +707,7 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          completion_percentage?: number | null
           created_at?: string
           id?: string
           student_id: string
@@ -666,6 +717,7 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          completion_percentage?: number | null
           created_at?: string
           id?: string
           student_id?: string
@@ -674,6 +726,20 @@ export type Database = {
           watch_time?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_student_video_progress_student"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_student_video_progress_video"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "student_video_progress_student_id_fkey"
             columns: ["student_id"]
@@ -734,6 +800,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string | null
+          duration_seconds: number | null
           id: string
           thumbnail: string | null
           title: string
@@ -746,6 +813,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          duration_seconds?: number | null
           id?: string
           thumbnail?: string | null
           title: string
@@ -758,6 +826,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           description?: string | null
+          duration_seconds?: number | null
           id?: string
           thumbnail?: string | null
           title?: string

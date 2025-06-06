@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Play, Users, LogOut, Trophy, Bell } from 'lucide-react';
+import { BookOpen, Play, LogOut, Trophy, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import ModuleSubscription from '@/components/ModuleSubscription';
 import NotificationCenter from '@/components/NotificationCenter';
 import AchievementBadges from '@/components/AchievementBadges';
 
@@ -21,28 +20,12 @@ interface Course {
   thumbnail: string;
 }
 
-interface Module {
-  id: string;
-  title: string;
-  description: string;
-  course_id: string;
-  order_index: number;
-  is_active: boolean;
-  courses: Course;
-}
-
 interface Enrollment {
   id: string;
   course_id: string;
   enrolled_at: string;
-  courses: Course;
-}
-
-interface ModuleSubscription {
-  id: string;
-  module_id: string;
-  progress: number;
   completed_at: string | null;
+  courses: Course;
 }
 
 const StudentDashboard = () => {
@@ -50,73 +33,39 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [availableModules, setAvailableModules] = useState<Module[]>([]);
-  const [moduleSubscriptions, setModuleSubscriptions] = useState<ModuleSubscription[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (student) {
-      fetchData();
+      fetchEnrollments();
     }
   }, [student]);
-
-  const fetchData = async () => {
-    await Promise.all([
-      fetchEnrollments(),
-      fetchAvailableModules(),
-      fetchModuleSubscriptions()
-    ]);
-    setLoading(false);
-  };
 
   const fetchEnrollments = async () => {
     if (!student) return;
 
-    const { data } = await supabase
-      .from('student_enrollments')
-      .select(`
-        *,
-        courses (
-          id,
-          title,
-          description,
-          thumbnail
-        )
-      `)
-      .eq('student_id', student.id)
-      .eq('is_active', true);
+    try {
+      const { data } = await supabase
+        .from('student_enrollments')
+        .select(`
+          *,
+          courses (
+            id,
+            title,
+            description,
+            thumbnail
+          )
+        `)
+        .eq('student_id', student.id)
+        .eq('is_active', true)
+        .order('enrolled_at', { ascending: false });
 
-    if (data) setEnrollments(data);
-  };
-
-  const fetchAvailableModules = async () => {
-    const { data } = await supabase
-      .from('modules')
-      .select(`
-        *,
-        courses (
-          id,
-          title,
-          description,
-          thumbnail
-        )
-      `)
-      .eq('is_active', true)
-      .order('order_index');
-
-    if (data) setAvailableModules(data);
-  };
-
-  const fetchModuleSubscriptions = async () => {
-    if (!student) return;
-
-    const { data } = await supabase
-      .from('module_subscriptions')
-      .select('*')
-      .eq('student_id', student.id)
-      .eq('is_active', true);
-
-    if (data) setModuleSubscriptions(data);
+      if (data) setEnrollments(data);
+    } catch (error) {
+      console.error('Error fetching enrollments:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -128,8 +77,8 @@ const StudentDashboard = () => {
     navigate('/');
   };
 
-  const getModuleSubscription = (moduleId: string) => {
-    return moduleSubscriptions.find(sub => sub.module_id === moduleId);
+  const startLearning = (courseId: string) => {
+    navigate(`/course/${courseId}`);
   };
 
   if (loading) {
@@ -172,9 +121,8 @@ const StudentDashboard = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="courses" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="courses" className="arabic-text">دوراتي</TabsTrigger>
-            <TabsTrigger value="modules" className="arabic-text">المودولات</TabsTrigger>
             <TabsTrigger value="achievements" className="arabic-text">الإنجازات</TabsTrigger>
             <TabsTrigger value="notifications" className="arabic-text">الإشعارات</TabsTrigger>
           </TabsList>
@@ -206,12 +154,20 @@ const StudentDashboard = () => {
                             alt={enrollment.courses.title}
                             className="w-full h-32 object-cover rounded-lg mb-4"
                           />
-                          <CardTitle className="arabic-heading text-lg">
-                            {enrollment.courses.title}
-                          </CardTitle>
+                          <div className="flex items-center justify-between mb-2">
+                            <CardTitle className="arabic-heading text-lg">
+                              {enrollment.courses.title}
+                            </CardTitle>
+                            {enrollment.completed_at && (
+                              <Badge className="bg-green-500">
+                                <Trophy size={12} className="ml-1" />
+                                مكتملة
+                              </Badge>
+                            )}
+                          </div>
                         </CardHeader>
                         <CardContent>
-                          <p className="text-slate-600 arabic-text text-sm mb-4">
+                          <p className="text-slate-600 arabic-text text-sm mb-4 line-clamp-2">
                             {enrollment.courses.description}
                           </p>
                           <div className="space-y-2">
@@ -219,43 +175,16 @@ const StudentDashboard = () => {
                               <span className="arabic-text">تاريخ التسجيل</span>
                               <span>{new Date(enrollment.enrolled_at).toLocaleDateString('ar')}</span>
                             </div>
-                            <Button className="w-full arabic-text">
+                            <Button 
+                              className="w-full arabic-text"
+                              onClick={() => startLearning(enrollment.course_id)}
+                            >
                               <Play className="ml-2 h-4 w-4" />
-                              متابعة التعلم
+                              {enrollment.completed_at ? 'مراجعة الدورة' : 'بدء التعلم'}
                             </Button>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="modules" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 arabic-heading">
-                  <Play className="h-5 w-5" />
-                  المودولات المتاحة
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {availableModules.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Play className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 arabic-text">لا توجد مودولات متاحة حالياً</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {availableModules.map((module) => (
-                      <ModuleSubscription
-                        key={module.id}
-                        module={module}
-                        subscription={getModuleSubscription(module.id)}
-                        onSubscriptionUpdate={fetchModuleSubscriptions}
-                      />
                     ))}
                   </div>
                 )}
