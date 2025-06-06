@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Play, CheckCircle, User, LogOut, GraduationCap } from 'lucide-react';
+import { BookOpen, Play, CheckCircle, User, LogOut, GraduationCap, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ModuleSubscription from '@/components/ModuleSubscription';
+import AssignmentCard from '@/components/AssignmentCard';
 
 interface Course {
   id: string;
@@ -50,6 +50,8 @@ const StudentDashboard = () => {
   const [availableCourses, setAvailableCourses] = useState<Course[]>([]);
   const [moduleSubscriptions, setModuleSubscriptions] = useState<ModuleSubscription[]>([]);
   const [availableModules, setAvailableModules] = useState<Module[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -128,10 +130,26 @@ const StudentDashboard = () => {
         .eq('is_active', true)
         .not('id', 'in', `(${subscribedModuleIds.join(',') || 'null'})`);
 
+      // Fetch assignments for enrolled courses
+      const { data: assignmentsData } = await supabase
+        .from('assignments')
+        .select('*')
+        .in('course_id', enrolledCourseIds)
+        .eq('is_active', true)
+        .order('due_date', { ascending: true });
+
+      // Fetch student's assignment submissions
+      const { data: submissionsData } = await supabase
+        .from('assignment_submissions')
+        .select('*')
+        .eq('student_id', student.id);
+
       if (enrollmentsData) setEnrollments(enrollmentsData);
       if (moduleSubscriptionsData) setModuleSubscriptions(moduleSubscriptionsData);
       if (availableCoursesData) setAvailableCourses(availableCoursesData);
       if (availableModulesData) setAvailableModules(availableModulesData);
+      if (assignmentsData) setAssignments(assignmentsData);
+      if (submissionsData) setSubmissions(submissionsData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -208,9 +226,10 @@ const StudentDashboard = () => {
 
         {/* Tabs for different content */}
         <Tabs defaultValue="courses" className="mb-8">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="courses" className="arabic-text">الدورات الكاملة</TabsTrigger>
             <TabsTrigger value="modules" className="arabic-text">المودولات المفردة</TabsTrigger>
+            <TabsTrigger value="assignments" className="arabic-text">الواجبات</TabsTrigger>
           </TabsList>
 
           <TabsContent value="courses" className="space-y-8">
@@ -338,6 +357,41 @@ const StudentDashboard = () => {
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="assignments" className="space-y-8">
+            {/* Student Assignments */}
+            <div>
+              <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
+                <FileText className="inline mr-2" size={24} />
+                واجباتي
+              </h3>
+              <div className="space-y-4">
+                {assignments.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText size={64} className="mx-auto text-slate-400 mb-4" />
+                    <h3 className="text-xl font-semibold text-slate-600 arabic-heading mb-2">
+                      لا توجد واجبات متاحة حالياً
+                    </h3>
+                    <p className="text-slate-500 arabic-text">
+                      ستظهر الواجبات هنا عند إضافتها من قبل المدربين
+                    </p>
+                  </div>
+                ) : (
+                  assignments.map((assignment) => {
+                    const submission = submissions.find(s => s.assignment_id === assignment.id);
+                    return (
+                      <AssignmentCard
+                        key={assignment.id}
+                        assignment={assignment}
+                        submission={submission}
+                        onSubmissionUpdate={fetchData}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 

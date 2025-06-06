@@ -2,124 +2,49 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Video, Folder, LogOut, Users } from 'lucide-react';
-import AdminVideoForm from './AdminVideoForm';
-import AdminCategoryForm from './AdminCategoryForm';
+import { LogOut, Users, BookOpen, Video, Settings, Globe, FileText } from 'lucide-react';
+import StudentManagement from './StudentManagement';
+import CourseAdministration from './CourseAdministration';
+import ModuleManagement from './ModuleManagement';
 import VideoManagement from './VideoManagement';
 import CategoryManagement from './CategoryManagement';
-import CourseAdministration from './CourseAdministration';
-
-// Define types based on the database schema
-interface Category {
-  id: string;
-  name: string;
-  description: string | null;
-  thumbnail: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface VideoCategory {
-  id: string;
-  name: string;
-  description: string | null;
-  thumbnail: string | null;
-}
-
-interface Video {
-  id: string;
-  title: string;
-  description: string | null;
-  youtube_url: string;
-  youtube_id: string;
-  thumbnail: string | null;
-  category_id: string | null;
-  views: number | null;
-  created_at: string;
-  updated_at: string;
-  categories?: VideoCategory;
-}
+import WebsiteEditor from './WebsiteEditor';
+import AssignmentManagement from './AssignmentManagement';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
+interface Course {
+  id: string;
+  title: string;
+}
+
 const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [showVideoForm, setShowVideoForm] = useState(false);
-  const [showCategoryForm, setShowCategoryForm] = useState(false);
-  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
-    fetchVideos();
-    fetchCategories();
+    fetchCourses();
   }, []);
 
-  const fetchVideos = async () => {
-    const { data, error } = await supabase
-      .from('videos')
-      .select(`
-        *,
-        categories (
-          id,
-          name,
-          description,
-          thumbnail
-        )
-      `)
-      .order('created_at', { ascending: false });
+  const fetchCourses = async () => {
+    const { data } = await supabase
+      .from('courses')
+      .select('id, title')
+      .eq('is_active', true)
+      .order('title');
     
-    if (!error && data) {
-      setVideos(data);
-    }
-  };
-
-  const fetchCategories = async () => {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (!error && data) {
-      setCategories(data);
-    }
-  };
-
-  const handleVideoSaved = () => {
-    fetchVideos();
-    setShowVideoForm(false);
-    setEditingVideo(null);
-  };
-
-  const handleCategorySaved = () => {
-    fetchCategories();
-    setShowCategoryForm(false);
-    setEditingCategory(null);
-  };
-
-  const handleEditVideo = (video: Video) => {
-    setEditingVideo(video);
-    setShowVideoForm(true);
-    setActiveTab('videos');
-  };
-
-  const handleEditCategory = (category: Category) => {
-    setEditingCategory(category);
-    setShowCategoryForm(true);
-    setActiveTab('categories');
+    if (data) setCourses(data);
   };
 
   return (
     <div className="min-h-screen bg-slate-50 font-cairo" dir="rtl">
+      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold text-slate-900 arabic-heading">لوحة التحكم الإدارية</h1>
+            <h1 className="text-2xl font-bold text-slate-900 arabic-heading">لوحة الإدارة</h1>
             <Button
               onClick={onLogout}
               variant="outline"
@@ -133,155 +58,64 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="overview" className="arabic-text">نظرة عامة</TabsTrigger>
-            <TabsTrigger value="courses" className="arabic-text">إدارة الدورات</TabsTrigger>
-            <TabsTrigger value="videos" className="arabic-text">إدارة الفيديوهات</TabsTrigger>
-            <TabsTrigger value="categories" className="arabic-text">إدارة الفئات</TabsTrigger>
+        <Tabs defaultValue="students" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="students" className="arabic-text flex items-center gap-2">
+              <Users size={16} />
+              الطلاب
+            </TabsTrigger>
+            <TabsTrigger value="courses" className="arabic-text flex items-center gap-2">
+              <BookOpen size={16} />
+              الدورات
+            </TabsTrigger>
+            <TabsTrigger value="modules" className="arabic-text flex items-center gap-2">
+              <Video size={16} />
+              المودولات
+            </TabsTrigger>
+            <TabsTrigger value="assignments" className="arabic-text flex items-center gap-2">
+              <FileText size={16} />
+              الواجبات
+            </TabsTrigger>
+            <TabsTrigger value="videos" className="arabic-text flex items-center gap-2">
+              <Video size={16} />
+              الفيديوهات
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="arabic-text flex items-center gap-2">
+              <Settings size={16} />
+              التصنيفات
+            </TabsTrigger>
+            <TabsTrigger value="website" className="arabic-text flex items-center gap-2">
+              <Globe size={16} />
+              الموقع
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium arabic-text">إجمالي الفيديوهات</CardTitle>
-                  <Video className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{videos.length}</div>
-                  <p className="text-xs text-muted-foreground arabic-text">فيديو في المنصة</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium arabic-text">إجمالي الفئات</CardTitle>
-                  <Folder className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{categories.length}</div>
-                  <p className="text-xs text-muted-foreground arabic-text">فئة متاحة</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium arabic-text">إجمالي المشاهدات</CardTitle>
-                  <Video className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {videos.reduce((sum, video) => sum + (video.views || 0), 0)}
-                  </div>
-                  <p className="text-xs text-muted-foreground arabic-text">مشاهدة إجمالية</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Button
-                onClick={() => {
-                  setActiveTab('courses');
-                }}
-                className="h-24 text-lg arabic-text"
-                size="lg"
-              >
-                <Users className="ml-2" size={24} />
-                إدارة الدورات والطلاب
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setShowVideoForm(true);
-                  setActiveTab('videos');
-                }}
-                variant="outline"
-                className="h-24 text-lg arabic-text"
-                size="lg"
-              >
-                <Plus className="ml-2" size={24} />
-                إضافة فيديو جديد
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setShowCategoryForm(true);
-                  setActiveTab('categories');
-                }}
-                variant="outline"
-                className="h-24 text-lg arabic-text"
-                size="lg"
-              >
-                <Plus className="ml-2" size={24} />
-                إضافة فئة جديدة
-              </Button>
-            </div>
+          <TabsContent value="students">
+            <StudentManagement />
           </TabsContent>
 
-          <TabsContent value="courses" className="space-y-6">
-            <CourseAdministration />
+          <TabsContent value="courses">
+            <CourseAdministration onCoursesUpdate={fetchCourses} />
           </TabsContent>
 
-          <TabsContent value="videos" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold arabic-heading">إدارة الفيديوهات</h2>
-              <Button
-                onClick={() => setShowVideoForm(true)}
-                className="arabic-text"
-              >
-                <Plus className="ml-2" size={16} />
-                إضافة فيديو
-              </Button>
-            </div>
-
-            {showVideoForm && (
-              <AdminVideoForm
-                video={editingVideo}
-                categories={categories}
-                onSave={handleVideoSaved}
-                onCancel={() => {
-                  setShowVideoForm(false);
-                  setEditingVideo(null);
-                }}
-              />
-            )}
-
-            <VideoManagement
-              videos={videos}
-              onEdit={handleEditVideo}
-              onRefresh={fetchVideos}
-            />
+          <TabsContent value="modules">
+            <ModuleManagement courses={courses} />
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold arabic-heading">إدارة الفئات</h2>
-              <Button
-                onClick={() => setShowCategoryForm(true)}
-                className="arabic-text"
-              >
-                <Plus className="ml-2" size={16} />
-                إضافة فئة
-              </Button>
-            </div>
+          <TabsContent value="assignments">
+            <AssignmentManagement courses={courses} />
+          </TabsContent>
 
-            {showCategoryForm && (
-              <AdminCategoryForm
-                category={editingCategory}
-                onSave={handleCategorySaved}
-                onCancel={() => {
-                  setShowCategoryForm(false);
-                  setEditingCategory(null);
-                }}
-              />
-            )}
+          <TabsContent value="videos">
+            <VideoManagement />
+          </TabsContent>
 
-            <CategoryManagement
-              categories={categories}
-              onEdit={handleEditCategory}
-              onRefresh={fetchCategories}
-            />
+          <TabsContent value="categories">
+            <CategoryManagement />
+          </TabsContent>
+
+          <TabsContent value="website">
+            <WebsiteEditor />
           </TabsContent>
         </Tabs>
       </div>

@@ -8,6 +8,7 @@ import SearchSection from '../components/SearchSection';
 import AboutSection from '../components/AboutSection';
 import ContactSection from '../components/ContactSection';
 import CourseSubscriptionSection from '../components/CourseSubscriptionSection';
+import Footer from '../components/Footer';
 
 const Index = () => {
   const [selectedVideo, setSelectedVideo] = useState(null);
@@ -22,6 +23,7 @@ const Index = () => {
       <FeaturedCategories onVideoSelect={setSelectedVideo} searchQuery={searchQuery} />
       <AboutSection />
       <ContactSection />
+      <Footer />
       
       {selectedVideo && (
         <VideoModal 
