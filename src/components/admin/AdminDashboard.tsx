@@ -21,11 +21,44 @@ interface Course {
   title: string;
 }
 
+interface Video {
+  id: string;
+  title: string;
+  description: string | null;
+  youtube_url: string;
+  youtube_id: string;
+  thumbnail: string | null;
+  category_id: string | null;
+  views: number | null;
+  created_at: string;
+  updated_at: string;
+  categories?: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description: string | null;
+  thumbnail: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   useEffect(() => {
     fetchCourses();
+    fetchVideos();
+    fetchCategories();
   }, []);
 
   const fetchCourses = async () => {
@@ -36,6 +69,31 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
       .order('title');
     
     if (data) setCourses(data);
+  };
+
+  const fetchVideos = async () => {
+    const { data } = await supabase
+      .from('videos')
+      .select(`
+        *,
+        categories (
+          id,
+          name,
+          description
+        )
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (data) setVideos(data);
+  };
+
+  const fetchCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (data) setCategories(data);
   };
 
   return (
@@ -95,7 +153,7 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
           </TabsContent>
 
           <TabsContent value="courses">
-            <CourseAdministration onCoursesUpdate={fetchCourses} />
+            <CourseAdministration />
           </TabsContent>
 
           <TabsContent value="modules">
@@ -107,11 +165,19 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
           </TabsContent>
 
           <TabsContent value="videos">
-            <VideoManagement />
+            <VideoManagement 
+              videos={videos}
+              onEdit={setEditingVideo}
+              onRefresh={fetchVideos}
+            />
           </TabsContent>
 
           <TabsContent value="categories">
-            <CategoryManagement />
+            <CategoryManagement 
+              categories={categories}
+              onEdit={setEditingCategory}
+              onRefresh={fetchCategories}
+            />
           </TabsContent>
 
           <TabsContent value="website">
