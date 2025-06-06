@@ -2,7 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Play, Users, TrendingUp } from 'lucide-react';
+import { BookOpen, Play, Users, TrendingUp, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Course {
   id: string;
@@ -18,7 +19,13 @@ interface FeaturedCoursesProps {
 }
 
 const FeaturedCourses = ({ courses, onEnroll }: FeaturedCoursesProps) => {
+  const navigate = useNavigate();
+
   if (courses.length === 0) return null;
+
+  const handleViewDetails = (courseId: string) => {
+    navigate(`/course-detail/${courseId}`);
+  };
 
   return (
     <div className="mb-16">
@@ -66,13 +73,24 @@ const FeaturedCourses = ({ courses, onEnroll }: FeaturedCoursesProps) => {
                 </div>
               </div>
               
-              <Button 
-                className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700 arabic-text shadow-lg"
-                onClick={() => onEnroll(course.id, 'course')}
-              >
-                اشترك في الدورة
-                <Play size={18} className="mr-2" />
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700 arabic-text shadow-lg"
+                  onClick={() => onEnroll(course.id, 'course')}
+                >
+                  اشترك في الدورة
+                  <Play size={18} className="mr-2" />
+                </Button>
+                
+                <Button 
+                  variant="outline"
+                  className="w-full h-10 arabic-text"
+                  onClick={() => handleViewDetails(course.id)}
+                >
+                  عرض التفاصيل
+                  <Eye size={16} className="mr-2" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}

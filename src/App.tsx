@@ -11,6 +11,7 @@ import Admin from "./pages/Admin";
 import StudentDashboard from "./pages/StudentDashboard";
 import CoachDashboard from "./pages/CoachDashboard";
 import CourseView from "./pages/CourseView";
+import CourseDetail from "./pages/CourseDetail";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/course-detail/:courseId" element={<CourseDetail />} />
             <Route 
               path="/dashboard" 
               element={

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Lock } from 'lucide-react';
+import { BookOpen, Lock, Eye } from 'lucide-react';
 
 interface Module {
   id: string;
@@ -30,6 +30,10 @@ const ModuleSubscription = ({ module }: ModuleSubscriptionProps) => {
     navigate(`/course/${module.course_id}`);
   };
 
+  const handleViewCourse = () => {
+    navigate(`/course-detail/${module.course_id}`);
+  };
+
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="pb-4">
@@ -51,18 +55,29 @@ const ModuleSubscription = ({ module }: ModuleSubscriptionProps) => {
           من دورة: {module.courses.title}
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <p className="text-slate-600 arabic-text text-sm mb-4 line-clamp-2">
           {module.description}
         </p>
         
-        <Button 
-          className="w-full arabic-text"
-          onClick={handleViewModule}
-        >
-          عرض في الدورة
-          <BookOpen size={16} className="mr-2" />
-        </Button>
+        <div className="space-y-2">
+          <Button 
+            className="w-full arabic-text"
+            onClick={handleViewModule}
+          >
+            عرض في الدورة
+            <BookOpen size={16} className="mr-2" />
+          </Button>
+          
+          <Button 
+            variant="outline"
+            className="w-full arabic-text"
+            onClick={handleViewCourse}
+          >
+            عرض تفاصيل الدورة
+            <Eye size={16} className="mr-2" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
