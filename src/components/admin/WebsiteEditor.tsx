@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +27,7 @@ const WebsiteEditor = () => {
     { key: 'hero_subtitle', value: 'محتوى تدريبي احترافي مصمم لمساعدتك على تجاوز التحديات', type: 'textarea', label: 'النص الفرعي', category: 'hero' },
     { key: 'hero_video_title', value: 'مرحباً بكم في رحلة التطوير الشخصي', type: 'text', label: 'عنوان الفيديو المميز', category: 'hero' },
     { key: 'hero_video_description', value: 'اكتشف كيفية إطلاق إمكاناتك وتحقيق أهدافك من خلال استراتيجيات التدريب المؤكدة.', type: 'textarea', label: 'وصف الفيديو المميز', category: 'hero' },
+    { key: 'hero_video_id', value: 'dQw4w9WgXcQ', type: 'text', label: 'معرف الفيديو على يوتيوب', category: 'hero' },
     { key: 'hero_video_thumbnail', value: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=800&h=450&fit=crop', type: 'text', label: 'صورة الفيديو المصغرة', category: 'hero' },
     { key: 'hero_primary_button', value: 'شاهد المقدمة', type: 'text', label: 'نص الزر الرئيسي', category: 'hero' },
     { key: 'hero_secondary_button', value: 'استكشف الفئات', type: 'text', label: 'نص الزر الثانوي', category: 'hero' },

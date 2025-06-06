@@ -35,6 +35,7 @@ export type Database = {
       }
       admin_users: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           email: string
           id: string
@@ -42,6 +43,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           email: string
           id?: string
@@ -49,6 +51,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           email?: string
           id?: string

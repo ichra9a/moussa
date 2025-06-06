@@ -3,99 +3,151 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import VideoCard from './VideoCard';
 
+interface Video {
+  id: string;
+  title: string;
+  description: string;
+  youtube_id: string;
+  youtube_url: string;
+  thumbnail: string;
+  duration_seconds: number;
+  views: number;
+  category: {
+    id: string;
+    name: string;
+    description: string;
+  };
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail: string;
+  videos: Video[];
+}
+
 interface FeaturedCategoriesProps {
   onVideoSelect: (video: any) => void;
   searchQuery: string;
 }
 
 const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesProps) => {
-  const [selectedCategory, setSelectedCategory] = useState('الكل');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [videos, setVideos] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    fetchCategories();
   }, []);
 
-  const fetchData = async () => {
+  const fetchCategories = async () => {
     try {
-      // Fetch categories
-      const { data: categoriesData } = await supabase
+      // First get categories
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name');
 
-      // Fetch videos with categories
-      const { data: videosData } = await supabase
+      if (categoriesError) {
+        console.error('Error fetching categories:', categoriesError);
+        return;
+      }
+
+      // Then get videos that are linked to categories but NOT linked to any modules
+      const { data: videosData, error: videosError } = await supabase
         .from('videos')
         .select(`
-          *,
-          categories (
+          id,
+          title,
+          description,
+          youtube_id,
+          youtube_url,
+          thumbnail,
+          duration_seconds,
+          views,
+          category_id,
+          categories(
             id,
             name,
             description
           )
         `)
+        .not('category_id', 'is', null)
+        .not('id', 'in', `(
+          SELECT video_id FROM module_videos
+        )`)
         .order('created_at', { ascending: false });
 
-      if (categoriesData) {
-        setCategories([
-          { id: 'all', name: 'الكل', color: 'bg-slate-100 text-slate-800' },
-          ...categoriesData.map(cat => ({
-            ...cat,
-            color: getCategoryColor(cat.name)
-          }))
-        ]);
+      if (videosError) {
+        console.error('Error fetching videos:', videosError);
+        return;
       }
 
-      if (videosData) {
-        const transformedVideos = videosData.map(video => ({
-          id: video.youtube_id,
-          title: video.title,
-          description: video.description || '',
-          category: video.categories?.name || 'غير مصنف',
-          thumbnail: video.thumbnail || `https://img.youtube.com/vi/${video.youtube_id}/maxresdefault.jpg`,
-          duration: '10:00', // You might want to fetch this from YouTube API
-          youtube_url: video.youtube_url,
-          youtube_id: video.youtube_id,
-          views: video.views || 0
-        }));
-        setVideos(transformedVideos);
-      }
+      // Group videos by category
+      const categoriesWithVideos = categoriesData?.map(category => ({
+        ...category,
+        videos: videosData?.filter(video => video.category_id === category.id)
+          .map(video => ({
+            ...video,
+            category: video.categories
+          })) || []
+      })) || [];
+
+      // Filter out categories with no videos
+      const filteredCategories = categoriesWithVideos.filter(category => category.videos.length > 0);
+
+      setCategories(filteredCategories);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error in fetchCategories:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getCategoryColor = (categoryName: string) => {
-    const colors = {
-      'العقلية والتطوير الذاتي': 'bg-blue-100 text-blue-800',
-      'اللياقة البدنية والصحة': 'bg-green-100 text-green-800',
-      'الإنتاجية والتنظيم': 'bg-purple-100 text-purple-800',
-      'القيادة والأعمال': 'bg-pink-100 text-pink-800'
-    };
-    return colors[categoryName as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  const filteredVideos = videos.filter(video => {
-    const matchesCategory = selectedCategory === 'الكل' || video.category === selectedCategory;
-    const matchesSearch = searchQuery === '' || 
+  const filteredCategories = categories.map(category => ({
+    ...category,
+    videos: category.videos.filter(video =>
+      searchQuery === '' ||
       video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      video.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      video.category.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesCategory && matchesSearch;
-  });
+      video.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      category.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  })).filter(category => category.videos.length > 0);
 
   if (loading) {
     return (
-      <section id="categories" className="bg-slate-50 py-16 font-cairo">
+      <section className="py-20 bg-white font-cairo">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4 arabic-heading">الفئات المميزة</h2>
+            <p className="text-xl text-slate-600 arabic-text">اكتشف مجموعة متنوعة من الدروس المفيدة</p>
+          </div>
+          <div className="animate-pulse space-y-8">
+            {[1, 2, 3].map(i => (
+              <div key={i}>
+                <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map(j => (
+                    <div key={j} className="h-64 bg-gray-200 rounded-lg"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (filteredCategories.length === 0) {
+    return (
+      <section className="py-20 bg-white font-cairo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-slate-500 arabic-text">جاري التحميل...</p>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4 arabic-heading">الفئات المميزة</h2>
+            <p className="text-xl text-slate-600 arabic-text">
+              {searchQuery ? 'لم يتم العثور على نتائج للبحث' : 'لا توجد فئات متاحة حالياً'}
+            </p>
           </div>
         </div>
       </section>
@@ -103,49 +155,43 @@ const FeaturedCategories = ({ onVideoSelect, searchQuery }: FeaturedCategoriesPr
   }
 
   return (
-    <section id="categories" className="bg-slate-50 py-16 font-cairo">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mobile-app">
-        <div className="text-center space-y-4 mb-12">
-          <h2 className="text-3xl font-bold text-slate-900 arabic-heading">الفئات المميزة</h2>
-          <p className="text-slate-600 max-w-2xl mx-auto arabic-text">
-            استكشف مجموعتنا المنسقة من فيديوهات التدريب المنظمة حسب الموضوع.
-          </p>
+    <section className="py-20 bg-white font-cairo">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-slate-900 mb-4 arabic-heading">الفئات المميزة</h2>
+          <p className="text-xl text-slate-600 arabic-text">اكتشف مجموعة متنوعة من الدروس المفيدة</p>
         </div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap justify-center gap-3 mb-12 px-4 md:px-0">
-          {categories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.name)}
-              className={`px-6 py-3 rounded-full font-medium transition-smooth arabic-text mobile-touch ${
-                selectedCategory === category.name
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : category.color + ' hover:scale-105'
-              }`}
-            >
-              {category.name}
-            </button>
-          ))}
-        </div>
+        <div className="space-y-16">
+          {filteredCategories.map((category) => (
+            <div key={category.id} className="space-y-8">
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-slate-900 mb-2 arabic-heading">{category.name}</h3>
+                {category.description && (
+                  <p className="text-slate-600 arabic-text">{category.description}</p>
+                )}
+              </div>
 
-        {/* Videos Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mobile-grid">
-          {filteredVideos.map((video, index) => (
-            <div key={index} className="mobile-card">
-              <VideoCard
-                video={video}
-                onSelect={() => onVideoSelect(video)}
-              />
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {category.videos.slice(0, 6).map((video) => (
+                  <VideoCard
+                    key={video.id}
+                    video={video}
+                    onVideoSelect={onVideoSelect}
+                  />
+                ))}
+              </div>
+
+              {category.videos.length > 6 && (
+                <div className="text-center">
+                  <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors arabic-text">
+                    عرض المزيد من {category.name}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
-
-        {filteredVideos.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-slate-500 text-lg arabic-text">لم يتم العثور على فيديوهات تطابق بحثك.</p>
-          </div>
-        )}
       </div>
     </section>
   );

@@ -84,47 +84,29 @@ const NotificationManagement = () => {
         throw globalError;
       }
 
-      // Send individual notifications to all students one by one
+      // Send individual notifications to all students
       if (students.length > 0) {
-        let successCount = 0;
-        let errorCount = 0;
+        const notifications = students.map(student => ({
+          student_id: student.id,
+          title: globalNotification.title,
+          message: globalNotification.message,
+          type: globalNotification.type,
+          is_read: false
+        }));
 
-        for (const student of students) {
-          try {
-            const { error: studentError } = await supabase
-              .from('notifications')
-              .insert({
-                student_id: student.id,
-                title: globalNotification.title,
-                message: globalNotification.message,
-                type: globalNotification.type,
-                is_read: false
-              });
+        const { error: batchError } = await supabase
+          .from('notifications')
+          .insert(notifications);
 
-            if (studentError) {
-              console.error(`Error sending notification to student ${student.id}:`, studentError);
-              errorCount++;
-            } else {
-              successCount++;
-            }
-          } catch (error) {
-            console.error(`Error sending notification to student ${student.id}:`, error);
-            errorCount++;
-          }
+        if (batchError) {
+          console.error('Batch notification error:', batchError);
+          throw batchError;
         }
 
-        if (errorCount > 0) {
-          toast({
-            title: "تم الإرسال جزئياً",
-            description: `تم إرسال الإشعار العام و ${successCount} إشعار شخصي من أصل ${students.length}`,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "تم الإرسال بنجاح",
-            description: `تم إرسال الإشعار العام و ${successCount} إشعار شخصي`
-          });
-        }
+        toast({
+          title: "تم الإرسال بنجاح",
+          description: `تم إرسال الإشعار لجميع الطلاب (${students.length} طالب)`
+        });
       } else {
         toast({
           title: "تم الإرسال بنجاح",
