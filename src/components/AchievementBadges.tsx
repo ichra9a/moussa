@@ -16,7 +16,7 @@ interface Achievement {
     courses: {
       title: string;
     };
-  };
+  } | null;
 }
 
 const AchievementBadges = () => {
@@ -34,7 +34,7 @@ const AchievementBadges = () => {
     if (!student) return;
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('student_achievements')
         .select(`
           *,
@@ -48,9 +48,17 @@ const AchievementBadges = () => {
         .eq('student_id', student.id)
         .order('earned_at', { ascending: false });
 
-      if (data) setAchievements(data);
+      if (error) {
+        console.error('Error fetching achievements:', error);
+        setAchievements([]);
+      } else if (data) {
+        // Filter out any achievements where modules failed to load
+        const validAchievements = data.filter(achievement => achievement.modules !== null);
+        setAchievements(validAchievements);
+      }
     } catch (error) {
       console.error('Error fetching achievements:', error);
+      setAchievements([]);
     } finally {
       setLoading(false);
     }
@@ -125,10 +133,10 @@ const AchievementBadges = () => {
                       {getAchievementTitle(achievement.achievement_type)}
                     </h4>
                     <p className="text-sm text-gray-600 arabic-text">
-                      {achievement.modules.title}
+                      {achievement.modules?.title || 'مودول غير متاح'}
                     </p>
                     <p className="text-xs text-gray-500 arabic-text">
-                      من دورة: {achievement.modules.courses.title}
+                      من دورة: {achievement.modules?.courses?.title || 'دورة غير متاحة'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {new Date(achievement.earned_at).toLocaleDateString('ar')}
