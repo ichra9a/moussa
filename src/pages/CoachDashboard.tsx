@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,7 +57,7 @@ const CoachDashboard = () => {
         .from('module_subscriptions')
         .select(`
           *,
-          students (full_name),
+          students!fk_module_subscriptions_student (full_name),
           modules (
             id,
             title,
@@ -83,7 +82,11 @@ const CoachDashboard = () => {
         .select('*')
         .eq('is_active', true);
 
-      if (subscriptionsData) setSubscriptions(subscriptionsData);
+      if (subscriptionsData) {
+        // Filter out any subscriptions where students failed to load
+        const validSubscriptions = subscriptionsData.filter(sub => sub.students !== null);
+        setSubscriptions(validSubscriptions);
+      }
       if (coursesData) setCourses(coursesData);
     } catch (error) {
       console.error('Error fetching data:', error);
