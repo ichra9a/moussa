@@ -281,7 +281,7 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
                       <SelectValue placeholder="اختر الدورة" />
                     </SelectTrigger>
                     <SelectContent>
-                      {courses.map((course) => (
+                      {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
                         <SelectItem key={course.id} value={course.id}>
                           {course.title}
                         </SelectItem>

@@ -21,43 +21,10 @@ interface Course {
   title: string;
 }
 
-// Remove the local Video and Category interfaces since we're using the ones from VideoManagement
-interface Video {
-  id: string;
-  title: string;
-  description: string | null;
-  youtube_url: string;
-  youtube_id: string;
-  thumbnail: string | null;
-  category_id: string | null;
-  views: number | null;
-  created_at: string;
-  updated_at: string;
-  categories?: {
-    id: string;
-    name: string;
-    description: string | null;
-    thumbnail: string | null;
-    created_at: string;
-    updated_at: string;
-  };
-}
-
-interface Category {
-  id: string;
-  name: string;
-  description: string | null;
-  thumbnail: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const [courses, setCourses] = useState<Course[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [editingVideo, setEditingVideo] = useState<Video | null>(null);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
 
   useEffect(() => {
     fetchCourses();
@@ -174,7 +141,7 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
           <TabsContent value="videos">
             <VideoManagement 
               videos={videos}
-              onEdit={setEditingVideo}
+              onEdit={() => {}}
               onRefresh={fetchVideos}
             />
           </TabsContent>
@@ -182,7 +149,7 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
           <TabsContent value="categories">
             <CategoryManagement 
               categories={categories}
-              onEdit={setEditingCategory}
+              onEdit={() => {}}
               onRefresh={fetchCategories}
             />
           </TabsContent>
