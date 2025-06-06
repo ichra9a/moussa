@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Users, Mail, Phone, Search, Key, Trash2 } from 'lucide-react';
+import { Plus, Users, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import StudentForm from './StudentForm';
+import StudentList from './StudentList';
 
 interface Student {
   id: string;
@@ -76,7 +76,6 @@ const StudentManagement = () => {
       if (error) throw error;
       
       if (data) {
-        // Filter out any enrollments where courses failed to load
         const validEnrollments = data.filter(enrollment => enrollment.courses !== null);
         setEnrollments(validEnrollments.map(enrollment => ({
           id: enrollment.id,
@@ -118,10 +117,6 @@ const StudentManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStudentEnrollments = (studentId: string) => {
-    return enrollments.filter(enrollment => enrollment.student_id === studentId);
   };
 
   const filteredStudents = students.filter(student => 
@@ -168,67 +163,12 @@ const StudentManagement = () => {
               />
             </div>
             
-            <div className="space-y-4">
-              {filteredStudents.length === 0 ? (
-                <p className="text-center text-gray-500 py-8 arabic-text">
-                  {searchQuery ? 'لا توجد نتائج للبحث' : 'لم يتم العثور على طلاب'}
-                </p>
-              ) : (
-                filteredStudents.map(student => (
-                  <div key={student.id} className="border rounded-lg p-4 bg-white shadow-sm">
-                    <div className="flex flex-col md:flex-row justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold arabic-text text-lg">{student.full_name}</h3>
-                        <div className="flex flex-col sm:flex-row gap-3 mt-2 text-gray-600 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-4 w-4" />
-                            {student.email}
-                          </span>
-                          {student.phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-4 w-4" />
-                              {student.phone}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 font-mono">
-                            <Key className="h-4 w-4" />
-                            PIN: {student.pin_code}
-                          </span>
-                        </div>
-                        
-                        {/* Student Enrollments */}
-                        <div className="mt-3">
-                          <p className="text-sm text-gray-500 mb-1 arabic-text">الدورات المسجل فيها:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {getStudentEnrollments(student.id).length > 0 ? (
-                              getStudentEnrollments(student.id).map(enrollment => (
-                                <Badge key={enrollment.id} variant="outline">
-                                  {enrollment.course_title}
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-sm text-gray-400 arabic-text">لا توجد دورات</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="self-start">
-                        <Button 
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteStudent(student.id)}
-                          className="arabic-text"
-                        >
-                          <Trash2 className="h-4 w-4 ml-1" />
-                          حذف
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+            <StudentList
+              students={filteredStudents}
+              enrollments={enrollments}
+              onDeleteStudent={handleDeleteStudent}
+              loading={loading}
+            />
           </CardContent>
         </Card>
       )}

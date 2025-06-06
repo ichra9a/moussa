@@ -3,12 +3,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, CheckCircle, Lock, Award, BookOpen } from 'lucide-react';
-import VideoPlayer from '@/components/VideoPlayer';
+import { ArrowRight } from 'lucide-react';
+import CourseProgress from '@/components/course/CourseProgress';
+import ModuleSection from '@/components/course/ModuleSection';
 
 interface Video {
   id: string;
@@ -39,8 +38,6 @@ const CourseView = () => {
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [videoProgress, setVideoProgress] = useState<VideoProgress[]>([]);
-  const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -120,7 +117,6 @@ const CourseView = () => {
         setModules(formattedModules);
       }
 
-      // Fetch video progress
       await fetchVideoProgress();
       
     } catch (error) {
@@ -159,19 +155,14 @@ const CourseView = () => {
   const isModuleUnlocked = (moduleIndex: number) => {
     if (moduleIndex === 0) return true;
     
-    // Check if previous module is completed
     const previousModule = modules[moduleIndex - 1];
     return previousModule ? isModuleCompleted(previousModule) : false;
   };
 
   const isVideoUnlocked = (moduleIndex: number, videoIndex: number) => {
-    // Module must be unlocked first
     if (!isModuleUnlocked(moduleIndex)) return false;
-    
-    // First video in module is always unlocked if module is unlocked
     if (videoIndex === 0) return true;
     
-    // Previous video in same module must be completed
     const module = modules[moduleIndex];
     const previousVideo = module.videos[videoIndex - 1];
     return previousVideo ? isVideoCompleted(previousVideo.id) : false;
@@ -180,7 +171,6 @@ const CourseView = () => {
   const handleVideoComplete = async (videoId: string) => {
     await fetchVideoProgress();
     
-    // Check if module is now complete
     const moduleIndex = modules.findIndex(module => 
       module.videos.some(video => video.id === videoId)
     );
@@ -188,7 +178,6 @@ const CourseView = () => {
     if (moduleIndex !== -1) {
       const module = modules[moduleIndex];
       if (isModuleCompleted(module)) {
-        // Award achievement for module completion
         try {
           await supabase
             .from('student_achievements')
@@ -198,7 +187,6 @@ const CourseView = () => {
               achievement_type: 'module_completion'
             });
 
-          // Send notification
           await supabase
             .from('notifications')
             .insert({
@@ -228,6 +216,13 @@ const CourseView = () => {
     return module.videos.length > 0 ? Math.round((completedVideos / module.videos.length) * 100) : 0;
   };
 
+  const overallProgress = getOverallProgress();
+  const completedModulesCount = modules.filter(module => isModuleCompleted(module)).length;
+  const totalVideos = modules.reduce((sum, module) => sum + module.videos.length, 0);
+  const completedVideos = modules.reduce((sum, module) => 
+    sum + module.videos.filter(video => isVideoCompleted(video.id)).length, 0
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -241,7 +236,6 @@ const CourseView = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-cairo" dir="rtl">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -259,7 +253,7 @@ const CourseView = () => {
               </h1>
             </div>
             <Badge variant="outline" className="arabic-text">
-              التقدم: {getOverallProgress()}%
+              التقدم: {overallProgress}%
             </Badge>
           </div>
         </div>
@@ -267,113 +261,25 @@ const CourseView = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar - Course Progress */}
-          <div className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="arabic-heading">تقدمك في الدورة</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="arabic-text">التقدم الإجمالي</span>
-                      <span>{getOverallProgress()}%</span>
-                    </div>
-                    <Progress value={getOverallProgress()} className="h-3" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="arabic-text">المودولات المكتملة</span>
-                      <span>
-                        {modules.filter(module => isModuleCompleted(module)).length} من {modules.length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="arabic-text">الفيديوهات المكتملة</span>
-                      <span>
-                        {modules.reduce((sum, module) => 
-                          sum + module.videos.filter(video => isVideoCompleted(video.id)).length, 0
-                        )} من {modules.reduce((sum, module) => sum + module.videos.length, 0)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <CourseProgress
+            modules={modules}
+            overallProgress={overallProgress}
+            completedModules={completedModulesCount}
+            completedVideos={completedVideos}
+            totalVideos={totalVideos}
+            isModuleCompleted={isModuleCompleted}
+            isModuleUnlocked={isModuleUnlocked}
+            getModuleProgress={getModuleProgress}
+          />
 
-            {/* Module Navigation */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="arabic-heading">المودولات</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {modules.map((module, index) => (
-                    <div
-                      key={module.id}
-                      className={`p-3 rounded-lg border transition-colors ${
-                        isModuleUnlocked(index) 
-                          ? 'border-blue-200 bg-blue-50' 
-                          : 'border-gray-200 bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        {isModuleCompleted(module) ? (
-                          <CheckCircle size={16} className="text-green-500" />
-                        ) : isModuleUnlocked(index) ? (
-                          <BookOpen size={16} className="text-blue-500" />
-                        ) : (
-                          <Lock size={16} className="text-gray-400" />
-                        )}
-                        <span className="text-sm font-medium arabic-text">
-                          {module.title}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-600 mb-2">
-                        {getModuleProgress(module)}% مكتمل
-                      </div>
-                      <Progress value={getModuleProgress(module)} className="h-1" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content - Videos */}
-          <div className="lg:col-span-3 space-y-6">
-            {modules.map((module, moduleIndex) => (
-              <Card key={module.id} className={`${!isModuleUnlocked(moduleIndex) ? 'opacity-60' : ''}`}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="arabic-heading flex items-center gap-3">
-                      {!isModuleUnlocked(moduleIndex) && <Lock size={20} className="text-slate-400" />}
-                      {isModuleCompleted(module) && <Award size={20} className="text-yellow-500" />}
-                      <span>المودول {moduleIndex + 1}: {module.title}</span>
-                    </CardTitle>
-                    <Badge variant={isModuleCompleted(module) ? 'default' : 'secondary'}>
-                      {module.videos.filter(video => isVideoCompleted(video.id)).length}/{module.videos.length} فيديو
-                    </Badge>
-                  </div>
-                  {module.description && (
-                    <p className="text-slate-600 arabic-text">{module.description}</p>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {module.videos.map((video, videoIndex) => (
-                    <VideoPlayer
-                      key={video.id}
-                      video={video}
-                      onVideoComplete={handleVideoComplete}
-                      isLocked={!isVideoUnlocked(moduleIndex, videoIndex)}
-                    />
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <ModuleSection
+            modules={modules}
+            isModuleCompleted={isModuleCompleted}
+            isModuleUnlocked={isModuleUnlocked}
+            isVideoUnlocked={isVideoUnlocked}
+            isVideoCompleted={isVideoCompleted}
+            onVideoComplete={handleVideoComplete}
+          />
         </div>
       </div>
     </div>

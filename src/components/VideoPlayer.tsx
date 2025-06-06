@@ -1,12 +1,13 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Play, Pause, RotateCcw, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import VideoControls from './video/VideoControls';
+import VideoProgress from './video/VideoProgress';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 
 interface Video {
   id: string;
@@ -28,16 +29,17 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.duration_seconds || 0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [completionPercentage, setCompletionPercentage] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [watchTime, setWatchTime] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    if (student) {
-      fetchVideoProgress();
-    }
-  }, [student, video.id]);
+  const {
+    watchTime,
+    setWatchTime,
+    completionPercentage,
+    setCompletionPercentage,
+    isCompleted,
+    setIsCompleted,
+    saveProgress
+  } = useVideoProgress(video.id);
 
   useEffect(() => {
     if (isPlaying && !isCompleted) {
@@ -48,12 +50,10 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
           setCompletionPercentage(percentage);
           setWatchTime(prev => prev + 1);
           
-          // Auto-complete when 95% watched to account for minor timing issues
           if (percentage >= 95 && !isCompleted) {
             handleVideoComplete();
           }
           
-          // Save progress every 10 seconds
           if (newTime % 10 === 0) {
             saveProgress(newTime, percentage);
           }
@@ -73,48 +73,6 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
       }
     };
   }, [isPlaying, duration, isCompleted]);
-
-  const fetchVideoProgress = async () => {
-    if (!student) return;
-
-    try {
-      const { data } = await supabase
-        .from('student_video_progress')
-        .select('*')
-        .eq('student_id', student.id)
-        .eq('video_id', video.id)
-        .maybeSingle();
-
-      if (data) {
-        setWatchTime(data.watch_time || 0);
-        setCompletionPercentage(data.completion_percentage || 0);
-        setIsCompleted(!!data.completed_at);
-        if (data.completion_percentage >= 95) {
-          setCurrentTime(duration);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching video progress:', error);
-    }
-  };
-
-  const saveProgress = async (currentWatchTime: number, percentage: number) => {
-    if (!student) return;
-
-    try {
-      await supabase
-        .from('student_video_progress')
-        .upsert({
-          student_id: student.id,
-          video_id: video.id,
-          watch_time: currentWatchTime,
-          completion_percentage: percentage,
-          completed_at: percentage >= 95 ? new Date().toISOString() : null
-        });
-    } catch (error) {
-      console.error('Error saving progress:', error);
-    }
-  };
 
   const handleVideoComplete = async () => {
     if (isCompleted || !student) return;
@@ -163,12 +121,6 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
     setIsPlaying(false);
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   if (isLocked) {
     return (
       <Card className="opacity-60">
@@ -200,7 +152,6 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Embedded YouTube Player - Restricted */}
         <div className="aspect-video relative">
           <iframe
             ref={playerRef}
@@ -213,55 +164,20 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
           />
         </div>
 
-        {/* Progress Tracking */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="arabic-text">التقدم</span>
-            <span>{completionPercentage}%</span>
-          </div>
-          <Progress value={completionPercentage} className="h-2" />
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>{formatTime(currentTime)}</span>
-            <span>{formatTime(duration)}</span>
-          </div>
-        </div>
+        <VideoProgress
+          completionPercentage={completionPercentage}
+          currentTime={currentTime}
+          duration={duration}
+          watchTime={watchTime}
+        />
 
-        {/* Controls */}
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={handlePlayPause}
-            className="arabic-text"
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {isPlaying ? 'إيقاف' : 'تشغيل'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleRestart}
-            className="arabic-text"
-          >
-            <RotateCcw className="h-4 w-4" />
-            إعادة
-          </Button>
-          {isCompleted && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="arabic-text bg-green-50 text-green-700"
-              disabled
-            >
-              <CheckCircle className="h-4 w-4" />
-              مكتمل
-            </Button>
-          )}
-        </div>
-
-        {/* Watch Time */}
-        <div className="text-sm text-gray-500 arabic-text">
-          وقت المشاهدة: {formatTime(watchTime)}
-        </div>
+        <VideoControls
+          isPlaying={isPlaying}
+          isCompleted={isCompleted}
+          isLocked={isLocked}
+          onPlayPause={handlePlayPause}
+          onRestart={handleRestart}
+        />
       </CardContent>
     </Card>
   );

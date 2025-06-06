@@ -1,19 +1,20 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, BookOpen, Save, X, Bell } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Plus, Users, BookOpen, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import StudentManagement from './StudentManagement';
 import ModuleManagement from './ModuleManagement';
 import NotificationManagement from './NotificationManagement';
+import CourseList from './CourseList';
+import CourseForm from './CourseForm';
 
 interface Course {
   id: string;
@@ -46,11 +47,6 @@ const CourseAdministration = () => {
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateCourse, setShowCreateCourse] = useState(false);
-  const [newCourse, setNewCourse] = useState({
-    title: '',
-    description: '',
-    thumbnail: ''
-  });
   const [activeTab, setActiveTab] = useState<string>('courses');
   const { toast } = useToast();
 
@@ -93,14 +89,13 @@ const CourseAdministration = () => {
       .order('enrolled_at', { ascending: false });
     
     if (data) {
-      // Filter out any enrollments where students failed to load
       const validEnrollments = data.filter(enrollment => enrollment.students !== null);
       setEnrollments(validEnrollments);
     }
   };
 
-  const handleCreateCourse = async () => {
-    if (!newCourse.title.trim()) {
+  const handleCreateCourse = async (courseData: { title: string; description: string; thumbnail: string }) => {
+    if (!courseData.title.trim()) {
       toast({
         title: "خطأ",
         description: "يرجى إدخال عنوان الدورة",
@@ -114,9 +109,9 @@ const CourseAdministration = () => {
       const { error } = await supabase
         .from('courses')
         .insert({
-          title: newCourse.title,
-          description: newCourse.description,
-          thumbnail: newCourse.thumbnail || '/placeholder.svg',
+          title: courseData.title,
+          description: courseData.description,
+          thumbnail: courseData.thumbnail || '/placeholder.svg',
           is_active: true
         });
 
@@ -127,7 +122,6 @@ const CourseAdministration = () => {
         description: "تم إنشاء الدورة بنجاح"
       });
 
-      setNewCourse({ title: '', description: '', thumbnail: '' });
       setShowCreateCourse(false);
       fetchCourses();
     } catch (error) {
@@ -154,7 +148,6 @@ const CourseAdministration = () => {
 
     setLoading(true);
     try {
-      // Check if already enrolled
       const { data: existingEnrollment } = await supabase
         .from('student_enrollments')
         .select('id')
@@ -172,7 +165,6 @@ const CourseAdministration = () => {
         return;
       }
 
-      // Enroll student
       const { error: enrollError } = await supabase
         .from('student_enrollments')
         .insert({
@@ -182,7 +174,6 @@ const CourseAdministration = () => {
 
       if (enrollError) throw enrollError;
 
-      // Send notification to student
       const selectedCourseData = courses.find(c => c.id === selectedCourse);
       const selectedStudentData = students.find(s => s.id === selectedStudent);
 
@@ -258,7 +249,6 @@ const CourseAdministration = () => {
         </TabsList>
 
         <TabsContent value="courses" className="space-y-6 mt-6">
-          {/* Create Course Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 arabic-heading">
@@ -276,84 +266,14 @@ const CourseAdministration = () => {
               </Button>
 
               {showCreateCourse && (
-                <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="arabic-text">عنوان الدورة</Label>
-                      <Input
-                        value={newCourse.title}
-                        onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                        placeholder="أدخل عنوان الدورة"
-                        className="arabic-text"
-                      />
-                    </div>
-                    <div>
-                      <Label className="arabic-text">رابط الصورة المصغرة</Label>
-                      <Input
-                        value={newCourse.thumbnail}
-                        onChange={(e) => setNewCourse({ ...newCourse, thumbnail: e.target.value })}
-                        placeholder="رابط الصورة (اختياري)"
-                        className="arabic-text"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="arabic-text">وصف الدورة</Label>
-                    <Textarea
-                      value={newCourse.description}
-                      onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                      placeholder="أدخل وصف الدورة"
-                      className="arabic-text"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleCreateCourse} disabled={loading} className="arabic-text">
-                      <Save className="ml-2 h-4 w-4" />
-                      حفظ الدورة
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowCreateCourse(false)}
-                      className="arabic-text"
-                    >
-                      <X className="ml-2 h-4 w-4" />
-                      إلغاء
-                    </Button>
-                  </div>
-                </div>
+                <CourseForm
+                  onSubmit={handleCreateCourse}
+                  onCancel={() => setShowCreateCourse(false)}
+                  loading={loading}
+                />
               )}
 
-              {/* Course List */}
-              <div className="space-y-4 mt-6">
-                <h3 className="font-semibold text-lg arabic-heading">قائمة الدورات الحالية</h3>
-                {courses.length === 0 ? (
-                  <p className="text-center text-gray-500 py-4 arabic-text">لا توجد دورات حالياً</p>
-                ) : (
-                  courses.map(course => (
-                    <Card key={course.id} className="overflow-hidden">
-                      <div className="flex flex-col md:flex-row">
-                        {course.thumbnail && (
-                          <div className="md:w-1/4 h-32 md:h-auto">
-                            <img 
-                              src={course.thumbnail} 
-                              alt={course.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <div className="p-4 flex-1">
-                          <h3 className="font-bold text-lg arabic-text">{course.title}</h3>
-                          <p className="text-gray-600 arabic-text mt-1">{course.description}</p>
-                          <Badge className="mt-2" variant={course.is_active ? "default" : "outline"}>
-                            {course.is_active ? "نشط" : "غير نشط"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </Card>
-                  ))
-                )}
-              </div>
+              <CourseList courses={courses} />
             </CardContent>
           </Card>
 
