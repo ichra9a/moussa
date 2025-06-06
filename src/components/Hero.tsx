@@ -1,13 +1,12 @@
-
 import { useState, useEffect } from 'react';
 import { Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-
 interface HeroProps {
   onVideoSelect: (video: any) => void;
 }
-
-const Hero = ({ onVideoSelect }: HeroProps) => {
+const Hero = ({
+  onVideoSelect
+}: HeroProps) => {
   const [content, setContent] = useState({
     title: 'طوّر من إمكاناتك',
     subtitle: 'محتوى تدريبي احترافي مصمم لمساعدتك على تجاوز التحديات، بناء الثقة، وتحقيق أهدافك الشخصية والمهنية.',
@@ -25,23 +24,14 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
       studentsLabel: 'طالب'
     }
   });
-
   useEffect(() => {
     fetchContent();
   }, []);
-
   const fetchContent = async () => {
     try {
-      const { data } = await supabase
-        .from('website_settings')
-        .select('setting_key, setting_value')
-        .in('setting_key', [
-          'hero_title', 'hero_subtitle', 'hero_video_title', 'hero_video_description',
-          'hero_video_thumbnail', 'hero_primary_button', 'hero_secondary_button',
-          'stats_videos', 'stats_videos_label', 'stats_categories', 'stats_categories_label',
-          'stats_students', 'stats_students_label'
-        ]);
-
+      const {
+        data
+      } = await supabase.from('website_settings').select('setting_key, setting_value').in('setting_key', ['hero_title', 'hero_subtitle', 'hero_video_title', 'hero_video_description', 'hero_video_thumbnail', 'hero_primary_button', 'hero_secondary_button', 'stats_videos', 'stats_videos_label', 'stats_categories', 'stats_categories_label', 'stats_students', 'stats_students_label']);
       if (data) {
         const settings: Record<string, any> = {};
         data.forEach((setting: any) => {
@@ -49,7 +39,6 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
           const value = setting.setting_value?.value || setting.setting_value;
           settings[setting.setting_key] = typeof value === 'string' ? value : String(value || '');
         });
-
         setContent({
           title: settings.hero_title || content.title,
           subtitle: settings.hero_subtitle || content.subtitle,
@@ -72,7 +61,6 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
       console.error('Error fetching hero content:', error);
     }
   };
-
   const featuredVideo = {
     id: 'dQw4w9WgXcQ',
     title: content.videoTitle,
@@ -85,15 +73,13 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
   const titleWords = titleText.split(' ');
   const mainTitle = titleWords.slice(0, -1).join(' ');
   const highlightedWord = titleWords.slice(-1)[0] || '';
-
-  return (
-    <section id="home" className="relative bg-gradient-to-br from-slate-50 to-slate-100 py-20 font-cairo">
+  return <section id="home" className="relative bg-gradient-to-br from-slate-50 to-slate-100 py-20 font-cairo">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Text Content */}
           <div className="space-y-8 text-right">
             <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight arabic-heading">
+              <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight arabic-heading text-justify py-0 my-0 mx-0 lg:text-8xl">
                 {mainTitle}
                 <span className="block text-blue-600">{highlightedWord}</span>
               </h1>
@@ -103,10 +89,7 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <button 
-                onClick={() => onVideoSelect(featuredVideo)}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2 arabic-text"
-              >
+              <button onClick={() => onVideoSelect(featuredVideo)} className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center gap-2 arabic-text">
                 <Play size={20} />
                 {content.primaryButton}
               </button>
@@ -133,15 +116,8 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
 
           {/* Featured Video Thumbnail */}
           <div className="relative">
-            <div 
-              className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group"
-              onClick={() => onVideoSelect(featuredVideo)}
-            >
-              <img 
-                src={featuredVideo.thumbnail}
-                alt={featuredVideo.title}
-                className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300"
-              />
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group" onClick={() => onVideoSelect(featuredVideo)}>
+              <img src={featuredVideo.thumbnail} alt={featuredVideo.title} className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300" />
               <div className="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Play size={24} className="text-blue-600 mr-1" />
@@ -151,8 +127,6 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default Hero;
