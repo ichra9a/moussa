@@ -47,6 +47,7 @@ const CourseAdministration = () => {
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateCourse, setShowCreateCourse] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<string>('courses');
   const { toast } = useToast();
 
@@ -129,6 +130,110 @@ const CourseAdministration = () => {
       toast({
         title: "خطأ",
         description: "حدث خطأ أثناء إنشاء الدورة",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCourse = async (courseData: { title: string; description: string; thumbnail: string }) => {
+    if (!editingCourse || !courseData.title.trim()) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال عنوان الدورة",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          title: courseData.title,
+          description: courseData.description,
+          thumbnail: courseData.thumbnail || '/placeholder.svg',
+        })
+        .eq('id', editingCourse.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم تعديل الدورة بنجاح"
+      });
+
+      setEditingCourse(null);
+      fetchCourses();
+    } catch (error) {
+      console.error('Error updating course:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تعديل الدورة",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الدورة؟ سيتم حذف جميع المودولات والفيديوهات المرتبطة بها.')) return;
+
+    setLoading(true);
+    try {
+      // First, delete related data
+      const { error: enrollmentsError } = await supabase
+        .from('student_enrollments')
+        .delete()
+        .eq('course_id', courseId);
+
+      if (enrollmentsError) throw enrollmentsError;
+
+      // Get modules to delete their videos
+      const { data: modules } = await supabase
+        .from('modules')
+        .select('id')
+        .eq('course_id', courseId);
+
+      if (modules && modules.length > 0) {
+        const moduleIds = modules.map(m => m.id);
+        
+        // Delete module videos
+        await supabase
+          .from('module_videos')
+          .delete()
+          .in('module_id', moduleIds);
+
+        // Delete modules
+        await supabase
+          .from('modules')
+          .delete()
+          .eq('course_id', courseId);
+      }
+
+      // Finally, delete the course
+      const { error } = await supabase
+        .from('courses')
+        .delete()
+        .eq('id', courseId);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف الدورة بنجاح"
+      });
+
+      fetchCourses();
+      fetchEnrollments();
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حذف الدورة",
         variant: "destructive"
       });
     } finally {
@@ -265,15 +370,26 @@ const CourseAdministration = () => {
                 إنشاء دورة جديدة
               </Button>
 
-              {showCreateCourse && (
+              {(showCreateCourse || editingCourse) && (
                 <CourseForm
-                  onSubmit={handleCreateCourse}
-                  onCancel={() => setShowCreateCourse(false)}
+                  course={editingCourse}
+                  onSubmit={editingCourse ? handleEditCourse : handleCreateCourse}
+                  onCancel={() => {
+                    setShowCreateCourse(false);
+                    setEditingCourse(null);
+                  }}
                   loading={loading}
                 />
               )}
 
-              <CourseList courses={courses} />
+              <CourseList 
+                courses={courses} 
+                onEditCourse={(course) => {
+                  setEditingCourse(course);
+                  setShowCreateCourse(false);
+                }}
+                onDeleteCourse={handleDeleteCourse}
+              />
             </CardContent>
           </Card>
 
