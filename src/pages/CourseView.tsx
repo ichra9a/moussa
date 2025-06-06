@@ -31,6 +31,11 @@ interface VideoProgress {
   completed_at: string | null;
 }
 
+interface ModuleCompletion {
+  module_id: string;
+  completed_at: string | null;
+}
+
 const CourseView = () => {
   const { courseId } = useParams();
   const { student } = useAuth();
@@ -38,6 +43,7 @@ const CourseView = () => {
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [videoProgress, setVideoProgress] = useState<VideoProgress[]>([]);
+  const [moduleCompletions, setModuleCompletions] = useState<ModuleCompletion[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -118,6 +124,7 @@ const CourseView = () => {
       }
 
       await fetchVideoProgress();
+      await fetchModuleCompletions();
       
     } catch (error) {
       console.error('Error fetching course data:', error);
@@ -143,13 +150,31 @@ const CourseView = () => {
     }
   };
 
+  const fetchModuleCompletions = async () => {
+    if (!student) return;
+
+    try {
+      const { data } = await supabase
+        .from('module_subscriptions')
+        .select('module_id, completed_at')
+        .eq('student_id', student.id);
+
+      if (data) {
+        setModuleCompletions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching module completions:', error);
+    }
+  };
+
   const isVideoCompleted = (videoId: string) => {
     const progress = videoProgress.find(p => p.video_id === videoId);
     return progress?.completed_at !== null && progress?.completion_percentage >= 95;
   };
 
   const isModuleCompleted = (module: Module) => {
-    return module.videos.every(video => isVideoCompleted(video.id));
+    const moduleCompletion = moduleCompletions.find(mc => mc.module_id === module.id);
+    return !!moduleCompletion?.completed_at;
   };
 
   const isModuleUnlocked = (moduleIndex: number) => {

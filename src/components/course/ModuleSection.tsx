@@ -63,6 +63,8 @@ const ModuleSection = ({
                 video={video}
                 onVideoComplete={onVideoComplete}
                 isLocked={!isVideoUnlocked(moduleIndex, videoIndex)}
+                moduleId={module.id}
+                isLastVideoInModule={videoIndex === module.videos.length - 1}
               />
             ))}
           </CardContent>

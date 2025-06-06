@@ -1,12 +1,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import VideoControls from './video/VideoControls';
 import VideoProgress from './video/VideoProgress';
+import ModuleCompletion from './video/ModuleCompletion';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 
 interface Video {
@@ -20,15 +21,24 @@ interface VideoPlayerProps {
   video: Video;
   onVideoComplete: (videoId: string) => void;
   isLocked?: boolean;
+  moduleId?: string;
+  isLastVideoInModule?: boolean;
 }
 
-const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerProps) => {
+const VideoPlayer = ({ 
+  video, 
+  onVideoComplete, 
+  isLocked = false, 
+  moduleId,
+  isLastVideoInModule = false 
+}: VideoPlayerProps) => {
   const { student } = useAuth();
   const { toast } = useToast();
   const playerRef = useRef<HTMLIFrameElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.duration_seconds || 0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isModuleCompleted, setIsModuleCompleted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -40,6 +50,12 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
     setIsCompleted,
     saveProgress
   } = useVideoProgress(video.id);
+
+  useEffect(() => {
+    if (moduleId && student) {
+      checkModuleCompletion();
+    }
+  }, [moduleId, student]);
 
   useEffect(() => {
     if (isPlaying && !isCompleted) {
@@ -74,6 +90,23 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
     };
   }, [isPlaying, duration, isCompleted]);
 
+  const checkModuleCompletion = async () => {
+    if (!moduleId || !student) return;
+
+    try {
+      const { data } = await supabase
+        .from('module_subscriptions')
+        .select('completed_at')
+        .eq('student_id', student.id)
+        .eq('module_id', moduleId)
+        .maybeSingle();
+
+      setIsModuleCompleted(!!data?.completed_at);
+    } catch (error) {
+      console.error('Error checking module completion:', error);
+    }
+  };
+
   const handleVideoComplete = async () => {
     if (isCompleted || !student) return;
 
@@ -102,6 +135,38 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
     }
   };
 
+  const handleModuleComplete = async () => {
+    if (!moduleId || !student) return;
+
+    try {
+      await supabase
+        .from('module_subscriptions')
+        .upsert({
+          student_id: student.id,
+          module_id: moduleId,
+          progress: 100,
+          completed_at: new Date().toISOString()
+        });
+
+      setIsModuleCompleted(true);
+
+      toast({
+        title: "تهانينا! 🎉",
+        description: "لقد أكملت هذه الوحدة بنجاح! يمكنك الآن الوصول للوحدة التالية",
+      });
+
+      // Refresh the page to update module access
+      window.location.reload();
+    } catch (error) {
+      console.error('Error marking module complete:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحديد الوحدة كمكتملة",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handlePlayPause = () => {
     if (isLocked) {
       toast({
@@ -126,13 +191,13 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
       <Card className="opacity-60">
         <CardHeader>
           <CardTitle className="arabic-heading flex items-center gap-2">
-            <div className="w-4 h-4 bg-gray-400 rounded-full" />
+            <Lock className="w-4 h-4 text-gray-400" />
             {video.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500 arabic-text">يجب إكمال الفيديوهات السابقة أولاً</p>
+            <p className="text-gray-500 arabic-text">يجب إكمال الوحدة السابقة أولاً</p>
           </div>
         </CardContent>
       </Card>
@@ -155,7 +220,7 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
         <div className="aspect-video relative">
           <iframe
             ref={playerRef}
-            src={`https://www.youtube.com/embed/${video.youtube_id}?enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&disablekb=1&iv_load_policy=3`}
+            src={`https://www.youtube-nocookie.com/embed/${video.youtube_id}?enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&disablekb=1&iv_load_policy=3&cc_load_policy=0&fs=1&autohide=1`}
             className="w-full h-full rounded-lg"
             frameBorder="0"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -178,6 +243,10 @@ const VideoPlayer = ({ video, onVideoComplete, isLocked = false }: VideoPlayerPr
           onPlayPause={handlePlayPause}
           onRestart={handleRestart}
         />
+
+        {isLastVideoInModule && isCompleted && !isModuleCompleted && (
+          <ModuleCompletion onComplete={handleModuleComplete} />
+        )}
       </CardContent>
     </Card>
   );

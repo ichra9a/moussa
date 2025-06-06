@@ -1,282 +1,263 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Video, Save, X, Trash2, Edit } from 'lucide-react';
+import { Plus, Edit, Trash2, Video, Eye, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+interface Video {
+  id: string;
+  title: string;
+  youtube_id: string;
+  duration_seconds: number;
+  thumbnail: string;
+}
 
 interface Module {
   id: string;
   title: string;
   description: string;
-  course_id: string;
   order_index: number;
+  course_id: string;
   is_active: boolean;
+  courses: {
+    title: string;
+  };
+  module_videos: Array<{
+    id: string;
+    order_index: number;
+    videos: Video;
+  }>;
 }
 
-interface Video {
-  id: string;
-  title: string;
-  youtube_url: string;
-  youtube_id: string;
-}
-
-interface Course {
-  id: string;
-  title: string;
-}
-
-interface ModuleManagementProps {
-  courses: Course[];
-}
-
-const ModuleManagement = ({ courses }: ModuleManagementProps) => {
-  const [modules, setModules] = useState<Module[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<string>('all');
-  const [showCreateModule, setShowCreateModule] = useState(false);
-  const [showAddVideo, setShowAddVideo] = useState<string | null>(null);
-  const [editingModule, setEditingModule] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [newModule, setNewModule] = useState({
-    title: '',
-    description: '',
-    course_id: ''
-  });
-  const [editModule, setEditModule] = useState({
-    id: '',
-    title: '',
-    description: '',
-    course_id: ''
-  });
-  const [newVideo, setNewVideo] = useState({
-    title: '',
-    youtube_url: ''
-  });
+const ModuleManagement = () => {
   const { toast } = useToast();
+  const [modules, setModules] = useState<Module[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingModule, setEditingModule] = useState<Module | null>(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    course_id: '',
+    order_index: 1
+  });
+  const [selectedVideo, setSelectedVideo] = useState('');
+  const [videoOrderIndex, setVideoOrderIndex] = useState(1);
 
   useEffect(() => {
     fetchModules();
+    fetchCourses();
     fetchVideos();
-  }, [selectedCourse]);
+  }, []);
 
   const fetchModules = async () => {
     try {
-      const query = supabase.from('modules').select('*').order('order_index');
-      
-      if (selectedCourse && selectedCourse !== 'all') {
-        query.eq('course_id', selectedCourse);
-      }
-      
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .from('modules')
+        .select(`
+          *,
+          courses(title),
+          module_videos(
+            id,
+            order_index,
+            videos(id, title, youtube_id, duration_seconds, thumbnail)
+          )
+        `)
+        .order('order_index');
+
       if (error) throw error;
-      if (data) setModules(data);
+      setModules(data || []);
     } catch (error) {
       console.error('Error fetching modules:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء جلب المودولات",
+        description: "فشل في تحميل الوحدات",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_active', true)
+        .order('title');
+
+      if (error) throw error;
+      setCourses(data || []);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
     }
   };
 
   const fetchVideos = async () => {
     try {
-      const { data, error } = await supabase.from('videos').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .order('title');
+
       if (error) throw error;
-      if (data) setVideos(data);
+      setVideos(data || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
     }
   };
 
-  const extractYouTubeId = (url: string) => {
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  };
-
-  const handleCreateModule = async () => {
-    if (!newModule.title.trim() || !newModule.course_id) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال عنوان المودول واختيار الدورة",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      const { error } = await supabase
-        .from('modules')
-        .insert({
-          title: newModule.title,
-          description: newModule.description,
-          course_id: newModule.course_id,
-          order_index: modules.length
+      if (editingModule) {
+        const { error } = await supabase
+          .from('modules')
+          .update({
+            title: formData.title,
+            description: formData.description,
+            course_id: formData.course_id,
+            order_index: formData.order_index
+          })
+          .eq('id', editingModule.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "تم التحديث",
+          description: "تم تحديث الوحدة بنجاح"
         });
+      } else {
+        const { error } = await supabase
+          .from('modules')
+          .insert({
+            title: formData.title,
+            description: formData.description,
+            course_id: formData.course_id,
+            order_index: formData.order_index
+          });
 
-      if (error) throw error;
+        if (error) throw error;
+        
+        toast({
+          title: "تم الإنشاء",
+          description: "تم إنشاء الوحدة بنجاح"
+        });
+      }
 
-      toast({
-        title: "تم بنجاح",
-        description: "تم إنشاء المودول بنجاح"
-      });
-
-      setNewModule({ title: '', description: '', course_id: '' });
-      setShowCreateModule(false);
-      fetchModules();
-    } catch (error) {
-      console.error('Error creating module:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إنشاء المودول",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleUpdateModule = async () => {
-    if (!editModule.title.trim()) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال عنوان المودول",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('modules')
-        .update({
-          title: editModule.title,
-          description: editModule.description,
-          course_id: editModule.course_id
-        })
-        .eq('id', editModule.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "تم بنجاح",
-        description: "تم تحديث المودول بنجاح"
-      });
-
+      setFormData({ title: '', description: '', course_id: '', order_index: 1 });
       setEditingModule(null);
-      setEditModule({ id: '', title: '', description: '', course_id: '' });
       fetchModules();
     } catch (error) {
-      console.error('Error updating module:', error);
+      console.error('Error saving module:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء تحديث المودول",
+        description: "فشل في حفظ الوحدة",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleAddVideoToModule = async (moduleId: string) => {
-    if (!newVideo.title.trim() || !newVideo.youtube_url.trim()) {
+    if (!selectedVideo) {
       toast({
         title: "خطأ",
-        description: "يرجى إدخال عنوان الفيديو ورابط اليوتيوب",
+        description: "يجب اختيار فيديو",
         variant: "destructive"
       });
       return;
     }
 
-    const youtubeId = extractYouTubeId(newVideo.youtube_url);
-    if (!youtubeId) {
-      toast({
-        title: "خطأ",
-        description: "رابط اليوتيوب غير صحيح",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
     try {
-      // First create the video
-      const { data: videoData, error: videoError } = await supabase
-        .from('videos')
-        .insert({
-          title: newVideo.title,
-          youtube_url: newVideo.youtube_url,
-          youtube_id: youtubeId,
-          thumbnail: `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
-        })
-        .select()
-        .single();
-
-      if (videoError) throw videoError;
-
-      // Get the current count of videos in this module
-      const { count } = await supabase
-        .from('module_videos')
-        .select('*', { count: 'exact', head: true })
-        .eq('module_id', moduleId);
-
-      // Then link it to the module
-      const { error: linkError } = await supabase
+      const { error } = await supabase
         .from('module_videos')
         .insert({
           module_id: moduleId,
-          video_id: videoData.id,
-          order_index: count || 0
+          video_id: selectedVideo,
+          order_index: videoOrderIndex
         });
-
-      if (linkError) throw linkError;
-
-      toast({
-        title: "تم بنجاح",
-        description: "تم إضافة الفيديو للمودول بنجاح"
-      });
-
-      setNewVideo({ title: '', youtube_url: '' });
-      setShowAddVideo(null);
-      fetchVideos();
-    } catch (error) {
-      console.error('Error adding video:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إضافة الفيديو",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا المودول؟')) return;
-
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('modules')
-        .delete()
-        .eq('id', moduleId);
 
       if (error) throw error;
 
       toast({
-        title: "تم بنجاح",
-        description: "تم حذف المودول بنجاح"
+        title: "تم الإضافة",
+        description: "تم إضافة الفيديو للوحدة بنجاح"
+      });
+
+      setSelectedVideo('');
+      setVideoOrderIndex(1);
+      fetchModules();
+    } catch (error) {
+      console.error('Error adding video to module:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في إضافة الفيديو",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveVideoFromModule = async (moduleVideoId: string) => {
+    try {
+      const { error } = await supabase
+        .from('module_videos')
+        .delete()
+        .eq('id', moduleVideoId);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف الفيديو من الوحدة"
+      });
+
+      fetchModules();
+    } catch (error) {
+      console.error('Error removing video from module:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في حذف الفيديو",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الوحدة؟')) return;
+
+    try {
+      const { error } = await supabase
+        .from('modules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف الوحدة بنجاح"
       });
 
       fetchModules();
@@ -284,279 +265,222 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
       console.error('Error deleting module:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء حذف المودول",
+        description: "فشل في حذف الوحدة",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  const startEditingModule = (module: Module) => {
-    setEditModule({
-      id: module.id,
-      title: module.title,
-      description: module.description,
-      course_id: module.course_id
-    });
-    setEditingModule(module.id);
-  };
+  if (loading) {
+    return <div className="text-center py-8">جاري التحميل...</div>;
+  }
 
   return (
-    <div className="space-y-6 font-cairo" dir="rtl">
-      {/* Course Filter */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="arabic-heading">تصفية حسب الدورة</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-            <SelectTrigger className="arabic-text">
-              <SelectValue placeholder="اختر دورة لعرض مودولاتها" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الدورات</SelectItem>
-              {courses.map((course) => (
-                <SelectItem key={course.id} value={course.id}>
-                  {course.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
-
-      {/* Create Module */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 arabic-heading">
-            <Video className="h-5 w-5" />
-            إدارة المودولات
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            onClick={() => setShowCreateModule(!showCreateModule)}
-            className="arabic-text"
-          >
-            <Plus className="ml-2 h-4 w-4" />
-            إنشاء مودول جديد
-          </Button>
-
-          {showCreateModule && (
-            <div className="border rounded-lg p-4 space-y-4 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="arabic-text">عنوان المودول</Label>
-                  <Input
-                    value={newModule.title}
-                    onChange={(e) => setNewModule({ ...newModule, title: e.target.value })}
-                    placeholder="أدخل عنوان المودول"
-                    className="arabic-text"
-                  />
-                </div>
-                <div>
-                  <Label className="arabic-text">الدورة</Label>
-                  <Select value={newModule.course_id} onValueChange={(value) => setNewModule({ ...newModule, course_id: value })}>
-                    <SelectTrigger className="arabic-text">
-                      <SelectValue placeholder="اختر الدورة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+    <div className="space-y-6" dir="rtl">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold arabic-heading">إدارة الوحدات</h2>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="arabic-text">
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة وحدة جديدة
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="arabic-heading">
+                {editingModule ? 'تعديل الوحدة' : 'إضافة وحدة جديدة'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label className="arabic-text">وصف المودول</Label>
-                <Textarea
-                  value={newModule.description}
-                  onChange={(e) => setNewModule({ ...newModule, description: e.target.value })}
-                  placeholder="أدخل وصف المودول"
+                <label className="block text-sm font-medium mb-2 arabic-text">العنوان</label>
+                <Input
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
                   className="arabic-text"
-                  rows={3}
                 />
               </div>
-              <div className="flex gap-2">
-                <Button onClick={handleCreateModule} disabled={loading} className="arabic-text">
-                  <Save className="ml-2 h-4 w-4" />
-                  حفظ المودول
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowCreateModule(false)}
+              <div>
+                <label className="block text-sm font-medium mb-2 arabic-text">الوصف</label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="arabic-text"
-                >
-                  <X className="ml-2 h-4 w-4" />
-                  إلغاء
-                </Button>
+                />
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <div>
+                <label className="block text-sm font-medium mb-2 arabic-text">الدورة</label>
+                <Select value={formData.course_id} onValueChange={(value) => setFormData({ ...formData, course_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الدورة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2 arabic-text">ترتيب الوحدة</label>
+                <Input
+                  type="number"
+                  value={formData.order_index}
+                  onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) })}
+                  min="1"
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full arabic-text">
+                {editingModule ? 'تحديث الوحدة' : 'إضافة الوحدة'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-      {/* Modules List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="arabic-heading">المودولات الموجودة</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {modules.length === 0 ? (
-              <p className="text-gray-500 arabic-text text-center py-4">
-                لا توجد مودولات {selectedCourse && selectedCourse !== 'all' ? 'في هذه الدورة' : ''}
-              </p>
-            ) : (
-              modules.map((module) => (
-                <div key={module.id} className="border rounded-lg p-4 space-y-3">
-                  {editingModule === module.id ? (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label className="arabic-text">عنوان المودول</Label>
-                          <Input
-                            value={editModule.title}
-                            onChange={(e) => setEditModule({ ...editModule, title: e.target.value })}
-                            placeholder="أدخل عنوان المودول"
-                            className="arabic-text"
-                          />
-                        </div>
-                        <div>
-                          <Label className="arabic-text">الدورة</Label>
-                          <Select value={editModule.course_id} onValueChange={(value) => setEditModule({ ...editModule, course_id: value })}>
-                            <SelectTrigger className="arabic-text">
-                              <SelectValue placeholder="اختر الدورة" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
-                                <SelectItem key={course.id} value={course.id}>
-                                  {course.title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="arabic-text">وصف المودول</Label>
-                        <Textarea
-                          value={editModule.description}
-                          onChange={(e) => setEditModule({ ...editModule, description: e.target.value })}
-                          placeholder="أدخل وصف المودول"
-                          className="arabic-text"
-                          rows={3}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button onClick={handleUpdateModule} disabled={loading} className="arabic-text">
-                          <Save className="ml-2 h-4 w-4" />
-                          حفظ التغييرات
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setEditingModule(null)}
-                          className="arabic-text"
-                        >
-                          <X className="ml-2 h-4 w-4" />
-                          إلغاء
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold arabic-text">{module.title}</h3>
-                          <p className="text-sm text-gray-600 arabic-text">{module.description}</p>
-                          <Badge variant={module.is_active ? "default" : "secondary"} className="mt-1">
-                            {module.is_active ? 'نشط' : 'غير نشط'}
-                          </Badge>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => startEditingModule(module)}
-                            className="arabic-text"
-                          >
-                            <Edit className="h-4 w-4 ml-1" />
-                            تعديل
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => setShowAddVideo(showAddVideo === module.id ? null : module.id)}
-                            className="arabic-text"
-                          >
-                            <Video className="h-4 w-4 ml-1" />
-                            إضافة فيديو
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteModule(module.id)}
-                            className="arabic-text"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {showAddVideo === module.id && (
-                        <div className="border-t pt-3 space-y-3 bg-blue-50 p-3 rounded">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <Label className="arabic-text">عنوان الفيديو</Label>
-                              <Input
-                                value={newVideo.title}
-                                onChange={(e) => setNewVideo({ ...newVideo, title: e.target.value })}
-                                placeholder="أدخل عنوان الفيديو"
-                                className="arabic-text"
-                              />
+      <div className="grid gap-6">
+        {modules.map((module) => (
+          <Card key={module.id}>
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <CardTitle className="arabic-heading">{module.title}</CardTitle>
+                  <p className="text-sm text-gray-600 arabic-text mt-1">
+                    من دورة: {module.courses.title}
+                  </p>
+                  {module.description && (
+                    <p className="text-sm text-gray-600 arabic-text mt-2">{module.description}</p>
+                  )}
+                  <Badge variant="outline" className="mt-2">
+                    الترتيب: {module.order_index}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setEditingModule(module);
+                      setFormData({
+                        title: module.title,
+                        description: module.description || '',
+                        course_id: module.course_id,
+                        order_index: module.order_index
+                      });
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDelete(module.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Videos in this module */}
+                <div>
+                  <h4 className="font-medium arabic-text mb-3 flex items-center gap-2">
+                    <Video className="h-4 w-4" />
+                    فيديوهات الوحدة ({module.module_videos?.length || 0})
+                  </h4>
+                  
+                  {module.module_videos && module.module_videos.length > 0 ? (
+                    <div className="space-y-2">
+                      {module.module_videos
+                        .sort((a, b) => a.order_index - b.order_index)
+                        .map((moduleVideo) => (
+                        <div key={moduleVideo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-blue-600 font-bold text-sm">{moduleVideo.order_index}</span>
                             </div>
                             <div>
-                              <Label className="arabic-text">رابط اليوتيوب</Label>
-                              <Input
-                                value={newVideo.youtube_url}
-                                onChange={(e) => setNewVideo({ ...newVideo, youtube_url: e.target.value })}
-                                placeholder="https://www.youtube.com/watch?v=..."
-                                className="arabic-text"
-                              />
+                              <p className="font-medium arabic-text">{moduleVideo.videos.title}</p>
+                              <p className="text-sm text-gray-500">YouTube ID: {moduleVideo.videos.youtube_id}</p>
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleAddVideoToModule(module.id)} 
-                              disabled={loading}
-                              className="arabic-text"
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(`/admin`, '_blank')}
                             >
-                              <Save className="ml-1 h-4 w-4" />
-                              إضافة الفيديو
+                              <Edit className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => setShowAddVideo(null)}
-                              className="arabic-text"
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(`https://youtube.com/watch?v=${moduleVideo.videos.youtube_id}`, '_blank')}
                             >
-                              إلغاء
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleRemoveVideoFromModule(moduleVideo.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                      )}
-                    </>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 arabic-text text-sm">لا توجد فيديوهات في هذه الوحدة</p>
                   )}
                 </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+
+                {/* Add video to module */}
+                <div className="border-t pt-4">
+                  <h5 className="font-medium arabic-text mb-3">إضافة فيديو للوحدة</h5>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <Select value={selectedVideo} onValueChange={setSelectedVideo}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر فيديو" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {videos.map((video) => (
+                            <SelectItem key={video.id} value={video.id}>
+                              {video.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-24">
+                      <Input
+                        type="number"
+                        placeholder="ترتيب"
+                        value={videoOrderIndex}
+                        onChange={(e) => setVideoOrderIndex(parseInt(e.target.value) || 1)}
+                        min="1"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => handleAddVideoToModule(module.id)}
+                      disabled={!selectedVideo}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };
