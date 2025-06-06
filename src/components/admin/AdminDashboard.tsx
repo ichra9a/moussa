@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,11 @@ interface Video {
   categories?: VideoCategory;
 }
 
-const AdminDashboard = () => {
+interface AdminDashboardProps {
+  onLogout: () => void;
+}
+
+const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showVideoForm, setShowVideoForm] = useState(false);
@@ -85,11 +90,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    // Simple logout - just reload the page to go back to PIN entry
-    window.location.reload();
-  };
-
   const handleVideoSaved = () => {
     fetchVideos();
     setShowVideoForm(false);
@@ -121,7 +121,7 @@ const AdminDashboard = () => {
           <div className="flex justify-between items-center h-16">
             <h1 className="text-2xl font-bold text-slate-900 arabic-heading">لوحة التحكم الإدارية</h1>
             <Button
-              onClick={handleLogout}
+              onClick={onLogout}
               variant="outline"
               className="flex items-center gap-2 arabic-text"
             >
