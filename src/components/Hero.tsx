@@ -45,7 +45,9 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
       if (data) {
         const settings: Record<string, any> = {};
         data.forEach((setting: any) => {
-          settings[setting.setting_key] = setting.setting_value?.value || setting.setting_value;
+          // Extract the actual value - it could be nested in a value property
+          const value = setting.setting_value?.value || setting.setting_value;
+          settings[setting.setting_key] = typeof value === 'string' ? value : String(value || '');
         });
 
         setContent({
@@ -78,6 +80,12 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
     thumbnail: content.videoThumbnail
   };
 
+  // Safely handle the title splitting - ensure it's a string
+  const titleText = String(content.title || 'طوّر من إمكاناتك');
+  const titleWords = titleText.split(' ');
+  const mainTitle = titleWords.slice(0, -1).join(' ');
+  const highlightedWord = titleWords.slice(-1)[0] || '';
+
   return (
     <section id="home" className="relative bg-gradient-to-br from-slate-50 to-slate-100 py-20 font-cairo">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -86,8 +94,8 @@ const Hero = ({ onVideoSelect }: HeroProps) => {
           <div className="space-y-8 text-right">
             <div className="space-y-4">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 leading-tight arabic-heading">
-                {content.title.split(' ').slice(0, -1).join(' ')}
-                <span className="block text-blue-600">{content.title.split(' ').slice(-1)}</span>
+                {mainTitle}
+                <span className="block text-blue-600">{highlightedWord}</span>
               </h1>
               <p className="text-xl text-slate-600 leading-relaxed arabic-text">
                 {content.subtitle}
