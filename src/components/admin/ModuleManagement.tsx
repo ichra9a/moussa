@@ -39,7 +39,7 @@ interface ModuleManagementProps {
 const ModuleManagement = ({ courses }: ModuleManagementProps) => {
   const [modules, setModules] = useState<Module[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<string>('');
+  const [selectedCourse, setSelectedCourse] = useState<string>('all');
   const [showCreateModule, setShowCreateModule] = useState(false);
   const [showAddVideo, setShowAddVideo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,7 +62,7 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
   const fetchModules = async () => {
     const query = supabase.from('modules').select('*').order('order_index');
     
-    if (selectedCourse) {
+    if (selectedCourse && selectedCourse !== 'all') {
       query.eq('course_id', selectedCourse);
     }
     
@@ -234,7 +234,7 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
               <SelectValue placeholder="اختر دورة لعرض مودولاتها" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">جميع الدورات</SelectItem>
+              <SelectItem value="all">جميع الدورات</SelectItem>
               {courses.map((course) => (
                 <SelectItem key={course.id} value={course.id}>
                   {course.title}
@@ -328,7 +328,7 @@ const ModuleManagement = ({ courses }: ModuleManagementProps) => {
           <div className="space-y-4">
             {modules.length === 0 ? (
               <p className="text-gray-500 arabic-text text-center py-4">
-                لا توجد مودولات {selectedCourse ? 'في هذه الدورة' : ''}
+                لا توجد مودولات {selectedCourse && selectedCourse !== 'all' ? 'في هذه الدورة' : ''}
               </p>
             ) : (
               modules.map((module) => (
