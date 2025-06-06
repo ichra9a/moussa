@@ -3,10 +3,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Bell, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -27,7 +25,6 @@ interface GlobalNotification {
 
 const NotificationCenter = () => {
   const { student } = useAuth();
-  const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [globalNotifications, setGlobalNotifications] = useState<GlobalNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +40,16 @@ const NotificationCenter = () => {
     if (!student) return;
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching notifications:', error);
+        return;
+      }
 
       if (data) setNotifications(data);
     } catch (error) {
@@ -57,11 +59,16 @@ const NotificationCenter = () => {
 
   const fetchGlobalNotifications = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('global_notifications')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
+
+      if (error) {
+        console.error('Error fetching global notifications:', error);
+        return;
+      }
 
       if (data) setGlobalNotifications(data);
     } catch (error) {
@@ -72,11 +79,14 @@ const NotificationCenter = () => {
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!student) return;
+
     try {
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('id', notificationId);
+        .eq('id', notificationId)
+        .eq('student_id', student.id);
 
       if (!error) {
         setNotifications(prev => 
