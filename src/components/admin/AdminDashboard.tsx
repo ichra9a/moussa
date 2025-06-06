@@ -21,6 +21,7 @@ interface Course {
   title: string;
 }
 
+// Remove the local Video and Category interfaces since we're using the ones from VideoManagement
 interface Video {
   id: string;
   title: string;
