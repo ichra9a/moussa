@@ -72,6 +72,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   const [selectedVideo, setSelectedVideo] = useState('');
   const [videoOrderIndex, setVideoOrderIndex] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchModules();
@@ -139,6 +140,24 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
     }
   };
 
+  const getNextOrderIndex = async (courseId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('modules')
+        .select('order_index')
+        .eq('course_id', courseId)
+        .order('order_index', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      
+      return data && data.length > 0 ? data[0].order_index + 1 : 1;
+    } catch (error) {
+      console.error('Error getting next order index:', error);
+      return 1;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -150,6 +169,8 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
       });
       return;
     }
+
+    setSubmitting(true);
     
     try {
       if (editingModule) {
@@ -170,13 +191,16 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
           description: "تم تحديث الوحدة بنجاح"
         });
       } else {
+        // Get the next available order index for the selected course
+        const nextOrderIndex = await getNextOrderIndex(formData.course_id);
+        
         const { error } = await supabase
           .from('modules')
           .insert({
             title: formData.title,
             description: formData.description,
             course_id: formData.course_id,
-            order_index: formData.order_index,
+            order_index: nextOrderIndex,
             is_active: true
           });
 
@@ -199,6 +223,8 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
         description: "فشل في حفظ الوحدة",
         variant: "destructive"
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -329,6 +355,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   required
                   className="arabic-text"
+                  disabled={submitting}
                 />
               </div>
               <div>
@@ -337,6 +364,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="arabic-text"
+                  disabled={submitting}
                 />
               </div>
               <div>
@@ -345,6 +373,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   value={formData.course_id} 
                   onValueChange={(value) => setFormData({ ...formData, course_id: value })}
                   required
+                  disabled={submitting}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الدورة" />
@@ -358,18 +387,21 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">ترتيب الوحدة</label>
-                <Input
-                  type="number"
-                  value={formData.order_index}
-                  onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 1 })}
-                  min="1"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full arabic-text">
-                {editingModule ? 'تحديث الوحدة' : 'إضافة الوحدة'}
+              {editingModule && (
+                <div>
+                  <label className="block text-sm font-medium mb-2 arabic-text">ترتيب الوحدة</label>
+                  <Input
+                    type="number"
+                    value={formData.order_index}
+                    onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 1 })}
+                    min="1"
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+              )}
+              <Button type="submit" className="w-full arabic-text" disabled={submitting}>
+                {submitting ? 'جاري الحفظ...' : (editingModule ? 'تحديث الوحدة' : 'إضافة الوحدة')}
               </Button>
             </form>
           </DialogContent>
