@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -187,7 +186,7 @@ const AssignmentManagement = ({ courses }: AssignmentManagementProps) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">جميع الدورات</SelectItem>
-              {courses.map((course) => (
+              {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
                 <SelectItem key={course.id} value={course.id}>
                   {course.title}
                 </SelectItem>
@@ -236,7 +235,7 @@ const AssignmentManagement = ({ courses }: AssignmentManagementProps) => {
                       <SelectValue placeholder="اختر الدورة" />
                     </SelectTrigger>
                     <SelectContent>
-                      {courses.map((course) => (
+                      {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
                         <SelectItem key={course.id} value={course.id}>
                           {course.title}
                         </SelectItem>
@@ -254,7 +253,7 @@ const AssignmentManagement = ({ courses }: AssignmentManagementProps) => {
                       <SelectValue placeholder="اختر المودول" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">بدون مودول</SelectItem>
+                      <SelectItem value="none">بدون مودول</SelectItem>
                       {getFilteredModules(newAssignment.course_id).map((module) => (
                         <SelectItem key={module.id} value={module.id}>
                           {module.title}
