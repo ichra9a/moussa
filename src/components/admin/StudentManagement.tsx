@@ -68,7 +68,7 @@ const StudentManagement = () => {
           id,
           student_id,
           course_id,
-          courses (
+          courses!fk_student_enrollments_course (
             title
           )
         `);
@@ -76,11 +76,13 @@ const StudentManagement = () => {
       if (error) throw error;
       
       if (data) {
-        setEnrollments(data.map(enrollment => ({
+        // Filter out any enrollments where courses failed to load
+        const validEnrollments = data.filter(enrollment => enrollment.courses !== null);
+        setEnrollments(validEnrollments.map(enrollment => ({
           id: enrollment.id,
           student_id: enrollment.student_id,
           course_id: enrollment.course_id,
-          course_title: enrollment.courses.title
+          course_title: enrollment.courses?.title || 'دورة غير متاحة'
         })));
       }
     } catch (error) {

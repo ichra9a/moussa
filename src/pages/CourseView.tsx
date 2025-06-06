@@ -88,7 +88,7 @@ const CourseView = () => {
           order_index,
           module_videos (
             order_index,
-            videos (
+            videos!fk_module_videos_video (
               id,
               title,
               youtube_id,
@@ -107,11 +107,12 @@ const CourseView = () => {
           description: module.description,
           order_index: module.order_index,
           videos: module.module_videos
+            .filter(mv => mv.videos !== null)
             .map(mv => ({ 
-              id: mv.videos.id,
-              title: mv.videos.title,
-              youtube_id: mv.videos.youtube_id,
-              duration_seconds: mv.videos.duration_seconds,
+              id: mv.videos!.id,
+              title: mv.videos!.title,
+              youtube_id: mv.videos!.youtube_id,
+              duration_seconds: mv.videos!.duration_seconds,
               order_index: mv.order_index 
             }))
             .sort((a, b) => a.order_index - b.order_index)

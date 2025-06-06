@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -84,7 +83,7 @@ const CourseAdministration = () => {
       .from('student_enrollments')
       .select(`
         *,
-        students (
+        students!fk_student_enrollments_student (
           id,
           full_name,
           pin_code,
@@ -93,7 +92,11 @@ const CourseAdministration = () => {
       `)
       .order('enrolled_at', { ascending: false });
     
-    if (data) setEnrollments(data);
+    if (data) {
+      // Filter out any enrollments where students failed to load
+      const validEnrollments = data.filter(enrollment => enrollment.students !== null);
+      setEnrollments(validEnrollments);
+    }
   };
 
   const handleCreateCourse = async () => {
