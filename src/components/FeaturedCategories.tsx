@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,7 +26,12 @@ interface Video {
   };
 }
 
-const FeaturedCategories = () => {
+interface FeaturedCategoriesProps {
+  onVideoSelect?: (video: any) => void;
+  searchQuery?: string;
+}
+
+const FeaturedCategories = ({ onVideoSelect, searchQuery = '' }: FeaturedCategoriesProps) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -117,9 +121,22 @@ const FeaturedCategories = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const filteredVideos = selectedCategory 
-    ? videos.filter(video => video.category.id === selectedCategory)
-    : videos;
+  const filteredVideos = videos.filter(video => {
+    const matchesCategory = selectedCategory === '' || video.category.id === selectedCategory;
+    const matchesSearch = searchQuery === '' || 
+      video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      video.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      video.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleVideoClick = (video: Video) => {
+    if (onVideoSelect) {
+      onVideoSelect(video);
+    } else {
+      window.open(video.youtube_url, '_blank');
+    }
+  };
 
   if (loading) {
     return (
@@ -197,7 +214,7 @@ const FeaturedCategories = () => {
                   <Button
                     size="lg"
                     className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full bg-white text-black hover:bg-gray-100"
-                    onClick={() => window.open(video.youtube_url, '_blank')}
+                    onClick={() => handleVideoClick(video)}
                   >
                     <Play className="h-6 w-6" />
                   </Button>
@@ -229,7 +246,7 @@ const FeaturedCategories = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(video.youtube_url, '_blank')}
+                    onClick={() => handleVideoClick(video)}
                     className="arabic-text"
                   >
                     مشاهدة
@@ -243,7 +260,7 @@ const FeaturedCategories = () => {
         {filteredVideos.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg arabic-text">
-              لا توجد فيديوهات في هذا التصنيف حالياً
+              {searchQuery ? 'لا توجد نتائج للبحث' : 'لا توجد فيديوهات في هذا التصنيف حالياً'}
             </p>
           </div>
         )}
