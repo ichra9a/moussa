@@ -45,11 +45,11 @@ const StudentDashboard = () => {
     if (!student) return;
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('student_enrollments')
         .select(`
           *,
-          courses (
+          courses!fk_student_enrollments_course (
             id,
             title,
             description,
@@ -60,9 +60,17 @@ const StudentDashboard = () => {
         .eq('is_active', true)
         .order('enrolled_at', { ascending: false });
 
-      if (data) setEnrollments(data);
+      if (error) {
+        console.error('Error fetching enrollments:', error);
+        setEnrollments([]);
+      } else if (data) {
+        // Filter out any enrollments where courses failed to load
+        const validEnrollments = data.filter(enrollment => enrollment.courses !== null);
+        setEnrollments(validEnrollments);
+      }
     } catch (error) {
       console.error('Error fetching enrollments:', error);
+      setEnrollments([]);
     } finally {
       setLoading(false);
     }
@@ -150,13 +158,13 @@ const StudentDashboard = () => {
                       <Card key={enrollment.id} className="hover:shadow-lg transition-shadow">
                         <CardHeader className="pb-4">
                           <img 
-                            src={enrollment.courses.thumbnail || '/placeholder.svg'} 
-                            alt={enrollment.courses.title}
+                            src={enrollment.courses?.thumbnail || '/placeholder.svg'} 
+                            alt={enrollment.courses?.title || 'دورة'}
                             className="w-full h-32 object-cover rounded-lg mb-4"
                           />
                           <div className="flex items-center justify-between mb-2">
                             <CardTitle className="arabic-heading text-lg">
-                              {enrollment.courses.title}
+                              {enrollment.courses?.title || 'دورة غير متاحة'}
                             </CardTitle>
                             {enrollment.completed_at && (
                               <Badge className="bg-green-500">
@@ -168,7 +176,7 @@ const StudentDashboard = () => {
                         </CardHeader>
                         <CardContent>
                           <p className="text-slate-600 arabic-text text-sm mb-4 line-clamp-2">
-                            {enrollment.courses.description}
+                            {enrollment.courses?.description || 'وصف غير متاح'}
                           </p>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">

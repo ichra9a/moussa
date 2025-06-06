@@ -24,7 +24,7 @@ interface Module {
   course_id: string;
   order_index: number;
   is_active: boolean;
-  courses: Course;
+  courses: Course | null;
 }
 
 const CourseSubscriptionSection = () => {
@@ -50,11 +50,11 @@ const CourseSubscriptionSection = () => {
         .limit(3);
 
       // Fetch featured modules (first 3 active modules)
-      const { data: modulesData } = await supabase
+      const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select(`
           *,
-          courses (
+          courses!fk_modules_course (
             id,
             title,
             description,
@@ -67,7 +67,11 @@ const CourseSubscriptionSection = () => {
         .limit(3);
 
       if (coursesData) setFeaturedCourses(coursesData);
-      if (modulesData) setFeaturedModules(modulesData);
+      if (modulesData && !modulesError) {
+        // Filter out modules where courses failed to load
+        const validModules = modulesData.filter(module => module.courses !== null);
+        setFeaturedModules(validModules);
+      }
     } catch (error) {
       console.error('Error fetching featured content:', error);
     } finally {
@@ -248,7 +252,7 @@ const CourseSubscriptionSection = () => {
                   <CardHeader className="pb-4">
                     <div className="relative">
                       <img 
-                        src={module.courses.thumbnail || '/placeholder.svg'} 
+                        src={module.courses?.thumbnail || '/placeholder.svg'} 
                         alt={module.title}
                         className="w-full h-40 object-cover rounded-lg mb-4"
                       />
@@ -260,7 +264,7 @@ const CourseSubscriptionSection = () => {
                       {module.title}
                     </CardTitle>
                     <p className="text-sm text-slate-500 arabic-text">
-                      من دورة: {module.courses.title}
+                      من دورة: {module.courses?.title || 'دورة غير متاحة'}
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-4">

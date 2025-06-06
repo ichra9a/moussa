@@ -102,9 +102,18 @@ const CourseView = () => {
 
       if (modulesData) {
         const formattedModules = modulesData.map(module => ({
-          ...module,
+          id: module.id,
+          title: module.title,
+          description: module.description,
+          order_index: module.order_index,
           videos: module.module_videos
-            .map(mv => ({ ...mv.videos, order_index: mv.order_index }))
+            .map(mv => ({ 
+              id: mv.videos.id,
+              title: mv.videos.title,
+              youtube_id: mv.videos.youtube_id,
+              duration_seconds: mv.videos.duration_seconds,
+              order_index: mv.order_index 
+            }))
             .sort((a, b) => a.order_index - b.order_index)
         }));
         setModules(formattedModules);

@@ -40,7 +40,7 @@ const AchievementBadges = () => {
           *,
           modules (
             title,
-            courses (
+            courses!fk_modules_course (
               title
             )
           )
