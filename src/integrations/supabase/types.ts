@@ -379,6 +379,33 @@ export type Database = {
           },
         ]
       }
+      global_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          sent_by: string
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          sent_by?: string
+          title: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          sent_by?: string
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       module_subscriptions: {
         Row: {
           completed_at: string | null
@@ -503,6 +530,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          student_id: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          student_id: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          student_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      student_achievements: {
+        Row: {
+          achievement_type: string
+          earned_at: string
+          id: string
+          module_id: string
+          student_id: string
+        }
+        Insert: {
+          achievement_type?: string
+          earned_at?: string
+          id?: string
+          module_id: string
+          student_id: string
+        }
+        Update: {
+          achievement_type?: string
+          earned_at?: string
+          id?: string
+          module_id?: string
+          student_id?: string
+        }
+        Relationships: []
       }
       student_enrollments: {
         Row: {

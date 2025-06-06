@@ -10,10 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users, BookOpen, Save, X } from 'lucide-react';
+import { Plus, Users, BookOpen, Save, X, Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import StudentManagement from './StudentManagement';
 import ModuleManagement from './ModuleManagement';
+import NotificationManagement from './NotificationManagement';
 
 interface Course {
   id: string;
@@ -150,27 +151,52 @@ const CourseAdministration = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // Check if already enrolled
+      const { data: existingEnrollment } = await supabase
+        .from('student_enrollments')
+        .select('id')
+        .eq('student_id', selectedStudent)
+        .eq('course_id', selectedCourse)
+        .single();
+
+      if (existingEnrollment) {
+        toast({
+          title: "تنبيه",
+          description: "الطالب مسجل بالفعل في هذه الدورة",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Enroll student
+      const { error: enrollError } = await supabase
         .from('student_enrollments')
         .insert({
           student_id: selectedStudent,
           course_id: selectedCourse
         });
 
-      if (error && error.code === '23505') {
-        toast({
-          title: "تنبيه",
-          description: "الطالب مسجل بالفعل في هذه الدورة",
-          variant: "destructive"
-        });
-        return;
-      }
+      if (enrollError) throw enrollError;
 
-      if (error) throw error;
+      // Send notification to student
+      const selectedCourseData = courses.find(c => c.id === selectedCourse);
+      const selectedStudentData = students.find(s => s.id === selectedStudent);
+
+      if (selectedCourseData && selectedStudentData) {
+        await supabase
+          .from('notifications')
+          .insert({
+            student_id: selectedStudent,
+            title: 'تم تسجيلك في دورة جديدة',
+            message: `تم تسجيلك في دورة "${selectedCourseData.title}" بنجاح. يمكنك الآن الوصول إلى محتوى الدورة.`,
+            type: 'success'
+          });
+      }
 
       toast({
         title: "تم بنجاح",
-        description: "تم تسجيل الطالب في الدورة بنجاح"
+        description: "تم تسجيل الطالب في الدورة وإرسال إشعار له"
       });
 
       setSelectedCourse('');
@@ -189,6 +215,8 @@ const CourseAdministration = () => {
   };
 
   const handleRemoveEnrollment = async (enrollmentId: string) => {
+    if (!confirm('هل أنت متأكد من إلغاء تسجيل هذا الطالب؟')) return;
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -219,10 +247,11 @@ const CourseAdministration = () => {
   return (
     <div className="space-y-8 font-cairo" dir="rtl">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="courses" className="arabic-text">الدورات</TabsTrigger>
           <TabsTrigger value="modules" className="arabic-text">المودولات</TabsTrigger>
           <TabsTrigger value="students" className="arabic-text">الطلاب</TabsTrigger>
+          <TabsTrigger value="notifications" className="arabic-text">الإشعارات</TabsTrigger>
         </TabsList>
 
         <TabsContent value="courses" className="space-y-6 mt-6">
@@ -342,7 +371,7 @@ const CourseAdministration = () => {
                       <SelectValue placeholder="اختر دورة" />
                     </SelectTrigger>
                     <SelectContent>
-                      {courses.map((course) => (
+                      {courses.filter(course => course.id && course.id.trim() !== '').map((course) => (
                         <SelectItem key={course.id} value={course.id}>
                           {course.title}
                         </SelectItem>
@@ -424,6 +453,10 @@ const CourseAdministration = () => {
 
         <TabsContent value="students" className="mt-6">
           <StudentManagement />
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
+          <NotificationManagement />
         </TabsContent>
       </Tabs>
     </div>

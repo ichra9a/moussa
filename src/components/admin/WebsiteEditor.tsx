@@ -6,110 +6,127 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Save, Upload, Settings, Globe } from 'lucide-react';
+import { Save, Settings, Type, Image } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface WebsiteSetting {
+  id: string;
   setting_key: string;
   setting_value: any;
   setting_type: string;
 }
 
 const WebsiteEditor = () => {
-  const [settings, setSettings] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<WebsiteSetting[]>([]);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const { toast } = useToast();
+
+  const defaultSettings = [
+    { key: 'site_title', value: 'منصة التعلم الإلكتروني', type: 'text', label: 'عنوان الموقع' },
+    { key: 'site_description', value: 'منصة تعليمية متقدمة لتطوير المهارات', type: 'textarea', label: 'وصف الموقع' },
+    { key: 'hero_title', value: 'ابدأ رحلتك التعليمية معنا', type: 'text', label: 'عنوان القسم الرئيسي' },
+    { key: 'hero_subtitle', value: 'اكتشف عالماً من المعرفة والمهارات الجديدة', type: 'text', label: 'العنوان الفرعي الرئيسي' },
+    { key: 'about_title', value: 'عن منصتنا التعليمية', type: 'text', label: 'عنوان قسم "حولنا"' },
+    { key: 'about_description', value: 'نحن منصة تعليمية متطورة تهدف إلى تقديم أفضل المحتويات التعليمية', type: 'textarea', label: 'وصف قسم "حولنا"' },
+    { key: 'contact_email', value: 'info@platform.com', type: 'email', label: 'البريد الإلكتروني للتواصل' },
+    { key: 'contact_phone', value: '+966 50 123 4567', type: 'text', label: 'رقم الهاتف' },
+    { key: 'footer_text', value: 'جميع الحقوق محفوظة 2024', type: 'text', label: 'نص الفوتر' }
+  ];
 
   useEffect(() => {
     fetchSettings();
   }, []);
 
   const fetchSettings = async () => {
+    setLoading(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('website_settings')
         .select('*');
 
-      if (data) {
-        const settingsObj: Record<string, any> = {};
-        data.forEach((setting: WebsiteSetting) => {
-          settingsObj[setting.setting_key] = setting.setting_value;
-        });
-        setSettings(settingsObj);
+      if (error) {
+        console.error('Error fetching settings:', error);
+        // Initialize with default settings if none exist
+        await initializeDefaultSettings();
+      } else {
+        setSettings(data || []);
+        // If no settings exist, initialize defaults
+        if (!data || data.length === 0) {
+          await initializeDefaultSettings();
+        }
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      console.error('Error in fetchSettings:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تحميل الإعدادات",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateSetting = async (key: string, value: any, type: string = 'text') => {
+  const initializeDefaultSettings = async () => {
     try {
-      const { error } = await supabase
-        .from('website_settings')
-        .upsert({
-          setting_key: key,
-          setting_value: value,
-          setting_type: type,
-          updated_at: new Date().toISOString()
-        });
+      const settingsToInsert = defaultSettings.map(setting => ({
+        setting_key: setting.key,
+        setting_value: { value: setting.value },
+        setting_type: setting.type
+      }));
 
-      if (error) throw error;
-      
-      setSettings(prev => ({ ...prev, [key]: value }));
-      return true;
+      const { data, error } = await supabase
+        .from('website_settings')
+        .insert(settingsToInsert)
+        .select();
+
+      if (error) {
+        console.error('Error initializing settings:', error);
+      } else {
+        setSettings(data || []);
+      }
     } catch (error) {
-      console.error('Error updating setting:', error);
-      return false;
+      console.error('Error in initializeDefaultSettings:', error);
     }
   };
 
-  const handleSaveContent = async () => {
+  const updateSetting = (settingKey: string, newValue: string) => {
+    setSettings(prev => 
+      prev.map(setting => 
+        setting.setting_key === settingKey 
+          ? { ...setting, setting_value: { value: newValue } }
+          : setting
+      )
+    );
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     try {
-      let success = true;
-      
-      // Save hero content
-      if (settings.hero_title) {
-        success = success && await updateSetting('hero_title', settings.hero_title);
-      }
-      if (settings.hero_subtitle) {
-        success = success && await updateSetting('hero_subtitle', settings.hero_subtitle);
-      }
-      if (settings.hero_video_id) {
-        success = success && await updateSetting('hero_video_id', settings.hero_video_id);
+      const updates = settings.map(setting => ({
+        id: setting.id,
+        setting_key: setting.setting_key,
+        setting_value: setting.setting_value,
+        setting_type: setting.setting_type
+      }));
+
+      const { error } = await supabase
+        .from('website_settings')
+        .upsert(updates, { onConflict: 'setting_key' });
+
+      if (error) {
+        throw error;
       }
 
-      // Save footer content
-      if (settings.footer_about) {
-        success = success && await updateSetting('footer_about', settings.footer_about);
-      }
-      if (settings.footer_contact_email) {
-        success = success && await updateSetting('footer_contact_email', settings.footer_contact_email);
-      }
-      if (settings.footer_links) {
-        success = success && await updateSetting('footer_links', settings.footer_links, 'json');
-      }
-      if (settings.footer_social_links) {
-        success = success && await updateSetting('footer_social_links', settings.footer_social_links, 'json');
-      }
-
-      if (success) {
-        toast({
-          title: "تم بنجاح",
-          description: "تم حفظ إعدادات الموقع بنجاح"
-        });
-      } else {
-        throw new Error('Some settings failed to save');
-      }
+      toast({
+        title: "تم الحفظ بنجاح",
+        description: "تم حفظ إعدادات الموقع بنجاح"
+      });
     } catch (error) {
       console.error('Error saving settings:', error);
       toast({
-        title: "خطأ",
+        title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء حفظ الإعدادات",
         variant: "destructive"
       });
@@ -118,43 +135,69 @@ const WebsiteEditor = () => {
     }
   };
 
-  const handleLogoUpload = async () => {
-    if (!logoFile) return;
+  const getSettingLabel = (key: string) => {
+    const defaultSetting = defaultSettings.find(s => s.key === key);
+    return defaultSetting?.label || key;
+  };
 
-    try {
-      const fileExt = logoFile.name.split('.').pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
+  const getSettingType = (key: string) => {
+    const defaultSetting = defaultSettings.find(s => s.key === key);
+    return defaultSetting?.type || 'text';
+  };
 
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(`logos/${fileName}`, logoFile);
+  const renderSettingInput = (setting: WebsiteSetting) => {
+    const settingType = getSettingType(setting.setting_key);
+    const value = setting.setting_value?.value || '';
 
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(`logos/${fileName}`);
-
-      await updateSetting('site_logo', data.publicUrl, 'image');
-
-      toast({
-        title: "تم بنجاح",
-        description: "تم رفع الشعار بنجاح"
-      });
-
-      setLogoFile(null);
-    } catch (error) {
-      console.error('Error uploading logo:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء رفع الشعار",
-        variant: "destructive"
-      });
+    switch (settingType) {
+      case 'textarea':
+        return (
+          <Textarea
+            value={value}
+            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            className="arabic-text"
+            rows={3}
+          />
+        );
+      case 'email':
+        return (
+          <Input
+            type="email"
+            value={value}
+            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            className="arabic-text"
+          />
+        );
+      default:
+        return (
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            className="arabic-text"
+          />
+        );
     }
   };
 
   if (loading) {
-    return <div className="flex justify-center p-8">جاري التحميل...</div>;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="arabic-heading">تحرير محتوى الموقع</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                <div className="h-10 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -162,192 +205,87 @@ const WebsiteEditor = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 arabic-heading">
-            <Globe className="h-5 w-5" />
-            محرر محتوى الموقع
+            <Settings className="h-5 w-5" />
+            تحرير محتوى الموقع
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="hero" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="hero" className="arabic-text">الصفحة الرئيسية</TabsTrigger>
-              <TabsTrigger value="logo" className="arabic-text">الشعار</TabsTrigger>
-              <TabsTrigger value="footer" className="arabic-text">الفوتر</TabsTrigger>
-              <TabsTrigger value="links" className="arabic-text">الروابط</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="hero" className="space-y-4">
-              <div>
-                <Label className="arabic-text">عنوان القسم الرئيسي (عربي)</Label>
-                <Input
-                  value={settings.hero_title?.ar || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    hero_title: { ...prev.hero_title, ar: e.target.value }
-                  }))}
-                  className="arabic-text"
-                />
-              </div>
-              <div>
-                <Label className="arabic-text">عنوان القسم الرئيسي (إنجليزي)</Label>
-                <Input
-                  value={settings.hero_title?.en || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    hero_title: { ...prev.hero_title, en: e.target.value }
-                  }))}
-                />
-              </div>
-              <div>
-                <Label className="arabic-text">النص الفرعي (عربي)</Label>
-                <Textarea
-                  value={settings.hero_subtitle?.ar || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    hero_subtitle: { ...prev.hero_subtitle, ar: e.target.value }
-                  }))}
-                  className="arabic-text"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label className="arabic-text">النص الفرعي (إنجليزي)</Label>
-                <Textarea
-                  value={settings.hero_subtitle?.en || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    hero_subtitle: { ...prev.hero_subtitle, en: e.target.value }
-                  }))}
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label className="arabic-text">معرف فيديو اليوتيوب</Label>
-                <Input
-                  value={settings.hero_video_id || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    hero_video_id: e.target.value
-                  }))}
-                  placeholder="dQw4w9WgXcQ"
-                />
-              </div>
-            </TabsContent>
-
-            <TabsContent value="logo" className="space-y-4">
-              <div>
-                <Label className="arabic-text">الشعار الحالي</Label>
-                {settings.site_logo && (
-                  <div className="mt-2">
-                    <img 
-                      src={settings.site_logo} 
-                      alt="Site Logo" 
-                      className="max-h-20 object-contain"
-                    />
+        <CardContent className="space-y-6">
+          {settings.length === 0 ? (
+            <div className="text-center py-8">
+              <Settings className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 arabic-text">جاري تحميل الإعدادات...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Site Basic Info */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-lg arabic-heading flex items-center gap-2">
+                  <Type className="h-5 w-5" />
+                  معلومات الموقع الأساسية
+                </h3>
+                {settings.filter(s => ['site_title', 'site_description'].includes(s.setting_key)).map((setting) => (
+                  <div key={setting.id} className="space-y-2">
+                    <Label className="arabic-text font-medium">
+                      {getSettingLabel(setting.setting_key)}
+                    </Label>
+                    {renderSettingInput(setting)}
                   </div>
-                )}
+                ))}
               </div>
-              <div>
-                <Label className="arabic-text">رفع شعار جديد</Label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
-                  className="arabic-text"
-                />
-              </div>
-              {logoFile && (
-                <Button onClick={handleLogoUpload} className="arabic-text">
-                  <Upload className="ml-2 h-4 w-4" />
-                  رفع الشعار
-                </Button>
-              )}
-            </TabsContent>
 
-            <TabsContent value="footer" className="space-y-4">
-              <div>
-                <Label className="arabic-text">نبذة عن المنصة (عربي)</Label>
-                <Textarea
-                  value={settings.footer_about?.ar || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    footer_about: { ...prev.footer_about, ar: e.target.value }
-                  }))}
-                  className="arabic-text"
-                  rows={3}
-                />
+              {/* Hero Section */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-lg arabic-heading flex items-center gap-2">
+                  <Image className="h-5 w-5" />
+                  القسم الرئيسي (Hero)
+                </h3>
+                {settings.filter(s => ['hero_title', 'hero_subtitle'].includes(s.setting_key)).map((setting) => (
+                  <div key={setting.id} className="space-y-2">
+                    <Label className="arabic-text font-medium">
+                      {getSettingLabel(setting.setting_key)}
+                    </Label>
+                    {renderSettingInput(setting)}
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label className="arabic-text">نبذة عن المنصة (إنجليزي)</Label>
-                <Textarea
-                  value={settings.footer_about?.en || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    footer_about: { ...prev.footer_about, en: e.target.value }
-                  }))}
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label className="arabic-text">البريد الإلكتروني</Label>
-                <Input
-                  value={settings.footer_contact_email || ''}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    footer_contact_email: e.target.value
-                  }))}
-                  type="email"
-                />
-              </div>
-            </TabsContent>
 
-            <TabsContent value="links" className="space-y-4">
-              <div>
-                <Label className="arabic-text">روابط التواصل الاجتماعي (JSON)</Label>
-                <Textarea
-                  value={JSON.stringify(settings.footer_social_links || [], null, 2)}
-                  onChange={(e) => {
-                    try {
-                      const parsed = JSON.parse(e.target.value);
-                      setSettings(prev => ({
-                        ...prev,
-                        footer_social_links: parsed
-                      }));
-                    } catch (error) {
-                      // Invalid JSON, ignore
-                    }
-                  }}
-                  className="font-mono"
-                  rows={6}
-                />
+              {/* About Section */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-lg arabic-heading">قسم "حولنا"</h3>
+                {settings.filter(s => ['about_title', 'about_description'].includes(s.setting_key)).map((setting) => (
+                  <div key={setting.id} className="space-y-2">
+                    <Label className="arabic-text font-medium">
+                      {getSettingLabel(setting.setting_key)}
+                    </Label>
+                    {renderSettingInput(setting)}
+                  </div>
+                ))}
               </div>
-              <div>
-                <Label className="arabic-text">روابط الصفحات (JSON)</Label>
-                <Textarea
-                  value={JSON.stringify(settings.footer_links || [], null, 2)}
-                  onChange={(e) => {
-                    try {
-                      const parsed = JSON.parse(e.target.value);
-                      setSettings(prev => ({
-                        ...prev,
-                        footer_links: parsed
-                      }));
-                    } catch (error) {
-                      // Invalid JSON, ignore
-                    }
-                  }}
-                  className="font-mono"
-                  rows={6}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
 
-          <div className="flex justify-end mt-6">
-            <Button onClick={handleSaveContent} disabled={saving} className="arabic-text">
-              <Save className="ml-2 h-4 w-4" />
-              {saving ? 'جاري الحفظ...' : 'حفظ التغييرات'}
-            </Button>
-          </div>
+              {/* Contact Info */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold text-lg arabic-heading">معلومات التواصل</h3>
+                {settings.filter(s => ['contact_email', 'contact_phone', 'footer_text'].includes(s.setting_key)).map((setting) => (
+                  <div key={setting.id} className="space-y-2">
+                    <Label className="arabic-text font-medium">
+                      {getSettingLabel(setting.setting_key)}
+                    </Label>
+                    {renderSettingInput(setting)}
+                  </div>
+                ))}
+              </div>
+
+              <Button 
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full arabic-text"
+                size="lg"
+              >
+                <Save className="ml-2 h-4 w-4" />
+                {saving ? 'جاري الحفظ...' : 'حفظ جميع التغييرات'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

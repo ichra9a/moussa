@@ -1,21 +1,24 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Play, CheckCircle, User, LogOut, GraduationCap, FileText } from 'lucide-react';
+import { BookOpen, Play, Users, LogOut, Trophy, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import ModuleSubscription from '@/components/ModuleSubscription';
-import AssignmentCard from '@/components/AssignmentCard';
+import NotificationCenter from '@/components/NotificationCenter';
+import AchievementBadges from '@/components/AchievementBadges';
 
 interface Course {
   id: string;
   title: string;
   description: string;
   thumbnail: string;
-  is_active: boolean;
 }
 
 interface Module {
@@ -32,7 +35,6 @@ interface Enrollment {
   id: string;
   course_id: string;
   enrolled_at: string;
-  completed_at: string | null;
   courses: Course;
 }
 
@@ -41,19 +43,16 @@ interface ModuleSubscription {
   module_id: string;
   progress: number;
   completed_at: string | null;
-  modules: Module;
 }
 
 const StudentDashboard = () => {
   const { student, signOut } = useAuth();
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [availableCourses, setAvailableCourses] = useState<Course[]>([]);
-  const [moduleSubscriptions, setModuleSubscriptions] = useState<ModuleSubscription[]>([]);
-  const [availableModules, setAvailableModules] = useState<Module[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [availableModules, setAvailableModules] = useState<Module[]>([]);
+  const [moduleSubscriptions, setModuleSubscriptions] = useState<ModuleSubscription[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (student) {
@@ -62,352 +61,216 @@ const StudentDashboard = () => {
   }, [student]);
 
   const fetchData = async () => {
-    if (!student) return;
-    
-    try {
-      // Fetch course enrollments
-      const { data: enrollmentsData } = await supabase
-        .from('student_enrollments')
-        .select(`
-          *,
-          courses (
-            id,
-            title,
-            description,
-            thumbnail,
-            is_active
-          )
-        `)
-        .eq('student_id', student.id)
-        .eq('is_active', true);
-
-      // Fetch module subscriptions
-      const { data: moduleSubscriptionsData } = await supabase
-        .from('module_subscriptions')
-        .select(`
-          *,
-          modules (
-            id,
-            title,
-            description,
-            course_id,
-            order_index,
-            is_active,
-            courses (
-              id,
-              title,
-              description,
-              thumbnail,
-              is_active
-            )
-          )
-        `)
-        .eq('student_id', student.id)
-        .eq('is_active', true);
-
-      // Fetch available courses (not enrolled)
-      const enrolledCourseIds = enrollmentsData?.map(e => e.course_id) || [];
-      const { data: availableCoursesData } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('is_active', true)
-        .not('id', 'in', `(${enrolledCourseIds.join(',') || 'null'})`);
-
-      // Fetch available modules (not subscribed)
-      const subscribedModuleIds = moduleSubscriptionsData?.map(s => s.module_id) || [];
-      const { data: availableModulesData } = await supabase
-        .from('modules')
-        .select(`
-          *,
-          courses (
-            id,
-            title,
-            description,
-            thumbnail,
-            is_active
-          )
-        `)
-        .eq('is_active', true)
-        .not('id', 'in', `(${subscribedModuleIds.join(',') || 'null'})`);
-
-      // Fetch assignments for enrolled courses
-      const { data: assignmentsData } = await supabase
-        .from('assignments')
-        .select('*')
-        .in('course_id', enrolledCourseIds)
-        .eq('is_active', true)
-        .order('due_date', { ascending: true });
-
-      // Fetch student's assignment submissions
-      const { data: submissionsData } = await supabase
-        .from('assignment_submissions')
-        .select('*')
-        .eq('student_id', student.id);
-
-      if (enrollmentsData) setEnrollments(enrollmentsData);
-      if (moduleSubscriptionsData) setModuleSubscriptions(moduleSubscriptionsData);
-      if (availableCoursesData) setAvailableCourses(availableCoursesData);
-      if (availableModulesData) setAvailableModules(availableModulesData);
-      if (assignmentsData) setAssignments(assignmentsData);
-      if (submissionsData) setSubmissions(submissionsData);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([
+      fetchEnrollments(),
+      fetchAvailableModules(),
+      fetchModuleSubscriptions()
+    ]);
+    setLoading(false);
   };
 
-  const enrollInCourse = async (courseId: string) => {
+  const fetchEnrollments = async () => {
     if (!student) return;
 
-    const { error } = await supabase
+    const { data } = await supabase
       .from('student_enrollments')
-      .insert({
-        student_id: student.id,
-        course_id: courseId
-      });
+      .select(`
+        *,
+        courses (
+          id,
+          title,
+          description,
+          thumbnail
+        )
+      `)
+      .eq('student_id', student.id)
+      .eq('is_active', true);
 
-    if (!error) {
-      fetchData();
-    }
+    if (data) setEnrollments(data);
   };
 
-  const handleLogout = async () => {
+  const fetchAvailableModules = async () => {
+    const { data } = await supabase
+      .from('modules')
+      .select(`
+        *,
+        courses (
+          id,
+          title,
+          description,
+          thumbnail
+        )
+      `)
+      .eq('is_active', true)
+      .order('order_index');
+
+    if (data) setAvailableModules(data);
+  };
+
+  const fetchModuleSubscriptions = async () => {
+    if (!student) return;
+
+    const { data } = await supabase
+      .from('module_subscriptions')
+      .select('*')
+      .eq('student_id', student.id)
+      .eq('is_active', true);
+
+    if (data) setModuleSubscriptions(data);
+  };
+
+  const handleSignOut = async () => {
     await signOut();
+    toast({
+      title: "تم تسجيل الخروج",
+      description: "تم تسجيل خروجك بنجاح",
+    });
     navigate('/');
+  };
+
+  const getModuleSubscription = (moduleId: string) => {
+    return moduleSubscriptions.find(sub => sub.module_id === moduleId);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="arabic-text text-slate-600">جاري التحميل...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 arabic-text">جاري تحميل لوحة التحكم...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-cairo" dir="rtl">
+    <div className="min-h-screen bg-gray-50 font-cairo" dir="rtl">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold text-slate-900 arabic-heading">لوحة الطالب</h1>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-slate-600">
-                <User size={16} />
-                <span className="arabic-text">{student?.full_name}</span>
-              </div>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                className="flex items-center gap-2 arabic-text"
-              >
-                <LogOut size={16} />
-                تسجيل الخروج
-              </Button>
+          <div className="flex justify-between items-center py-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 arabic-heading">
+                مرحباً، {student?.full_name}
+              </h1>
+              <p className="text-slate-600 arabic-text">
+                رمز PIN: {student?.pin_code}
+              </p>
             </div>
+            <Button
+              variant="outline"
+              onClick={handleSignOut}
+              className="arabic-text"
+            >
+              <LogOut className="ml-2 h-4 w-4" />
+              تسجيل الخروج
+            </Button>
           </div>
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-slate-900 arabic-heading mb-2">
-            مرحباً {student?.full_name}
-          </h2>
-          <p className="text-slate-600 arabic-text text-lg">
-            استمر في رحلتك التعليمية وحقق أهدافك
-          </p>
-        </div>
-
-        {/* Tabs for different content */}
-        <Tabs defaultValue="courses" className="mb-8">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="courses" className="arabic-text">الدورات الكاملة</TabsTrigger>
-            <TabsTrigger value="modules" className="arabic-text">المودولات المفردة</TabsTrigger>
-            <TabsTrigger value="assignments" className="arabic-text">الواجبات</TabsTrigger>
+        <Tabs defaultValue="courses" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="courses" className="arabic-text">دوراتي</TabsTrigger>
+            <TabsTrigger value="modules" className="arabic-text">المودولات</TabsTrigger>
+            <TabsTrigger value="achievements" className="arabic-text">الإنجازات</TabsTrigger>
+            <TabsTrigger value="notifications" className="arabic-text">الإشعارات</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="courses" className="space-y-8">
-            {/* Enrolled Courses */}
-            {enrollments.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
-                  دوراتي الحالية
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                  {enrollments.map((enrollment) => (
-                    <Card key={enrollment.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                      <CardHeader className="pb-4">
-                        <div className="relative">
+          <TabsContent value="courses" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 arabic-heading">
+                  <BookOpen className="h-5 w-5" />
+                  الدورات المسجل فيها
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {enrollments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 arabic-text">لم تسجل في أي دورة بعد</p>
+                    <p className="text-sm text-gray-400 arabic-text">
+                      تواصل مع الإدارة للتسجيل في الدورات
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {enrollments.map((enrollment) => (
+                      <Card key={enrollment.id} className="hover:shadow-lg transition-shadow">
+                        <CardHeader className="pb-4">
                           <img 
                             src={enrollment.courses.thumbnail || '/placeholder.svg'} 
                             alt={enrollment.courses.title}
                             className="w-full h-32 object-cover rounded-lg mb-4"
                           />
-                          {enrollment.completed_at && (
-                            <Badge className="absolute top-2 right-2 bg-green-500">
-                              <CheckCircle size={12} className="ml-1" />
-                              مكتملة
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="arabic-heading text-lg">
-                          {enrollment.courses.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-slate-600 arabic-text text-sm mb-4 line-clamp-2">
-                          {enrollment.courses.description}
-                        </p>
-                        <Button 
-                          className="w-full arabic-text"
-                          onClick={() => navigate(`/course/${enrollment.course_id}`)}
-                        >
-                          {enrollment.completed_at ? 'مراجعة الدورة' : 'متابعة التعلم'}
-                          <Play size={16} className="mr-2" />
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Available Courses */}
-            {availableCourses.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
-                  الدورات المتاحة
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {availableCourses.map((course) => (
-                    <Card key={course.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="pb-4">
-                        <img 
-                          src={course.thumbnail || '/placeholder.svg'} 
-                          alt={course.title}
-                          className="w-full h-32 object-cover rounded-lg mb-4"
-                        />
-                        <CardTitle className="arabic-heading text-lg">
-                          {course.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-slate-600 arabic-text text-sm mb-4 line-clamp-3">
-                          {course.description}
-                        </p>
-                        <Button 
-                          className="w-full arabic-text"
-                          onClick={() => enrollInCourse(course.id)}
-                        >
-                          التسجيل في الدورة
-                          <BookOpen size={16} className="mr-2" />
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
+                          <CardTitle className="arabic-heading text-lg">
+                            {enrollment.courses.title}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-slate-600 arabic-text text-sm mb-4">
+                            {enrollment.courses.description}
+                          </p>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="arabic-text">تاريخ التسجيل</span>
+                              <span>{new Date(enrollment.enrolled_at).toLocaleDateString('ar')}</span>
+                            </div>
+                            <Button className="w-full arabic-text">
+                              <Play className="ml-2 h-4 w-4" />
+                              متابعة التعلم
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          <TabsContent value="modules" className="space-y-8">
-            {/* Module Subscriptions */}
-            {moduleSubscriptions.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
-                  مودولاتي الحالية
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                  {moduleSubscriptions.map((subscription) => (
-                    <ModuleSubscription
-                      key={subscription.id}
-                      module={subscription.modules}
-                      subscription={{
-                        id: subscription.id,
-                        progress: subscription.progress,
-                        completed_at: subscription.completed_at
-                      }}
-                      onSubscriptionUpdate={fetchData}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Available Modules */}
-            {availableModules.length > 0 && (
-              <div>
-                <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
+          <TabsContent value="modules" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 arabic-heading">
+                  <Play className="h-5 w-5" />
                   المودولات المتاحة
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {availableModules.map((module) => (
-                    <ModuleSubscription
-                      key={module.id}
-                      module={module}
-                      onSubscriptionUpdate={fetchData}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="assignments" className="space-y-8">
-            {/* Student Assignments */}
-            <div>
-              <h3 className="text-2xl font-semibold text-slate-900 arabic-heading mb-6">
-                <FileText className="inline mr-2" size={24} />
-                واجباتي
-              </h3>
-              <div className="space-y-4">
-                {assignments.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FileText size={64} className="mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-xl font-semibold text-slate-600 arabic-heading mb-2">
-                      لا توجد واجبات متاحة حالياً
-                    </h3>
-                    <p className="text-slate-500 arabic-text">
-                      ستظهر الواجبات هنا عند إضافتها من قبل المدربين
-                    </p>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {availableModules.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Play className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 arabic-text">لا توجد مودولات متاحة حالياً</p>
                   </div>
                 ) : (
-                  assignments.map((assignment) => {
-                    const submission = submissions.find(s => s.assignment_id === assignment.id);
-                    return (
-                      <AssignmentCard
-                        key={assignment.id}
-                        assignment={assignment}
-                        submission={submission}
-                        onSubmissionUpdate={fetchData}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {availableModules.map((module) => (
+                      <ModuleSubscription
+                        key={module.id}
+                        module={module}
+                        subscription={getModuleSubscription(module.id)}
+                        onSubscriptionUpdate={fetchModuleSubscriptions}
                       />
-                    );
-                  })
+                    ))}
+                  </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="achievements">
+            <AchievementBadges />
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <NotificationCenter />
           </TabsContent>
         </Tabs>
-
-        {/* Empty State */}
-        {enrollments.length === 0 && availableCourses.length === 0 && 
-         moduleSubscriptions.length === 0 && availableModules.length === 0 && (
-          <div className="text-center py-12">
-            <GraduationCap size={64} className="mx-auto text-slate-400 mb-4" />
-            <h3 className="text-xl font-semibold text-slate-600 arabic-heading mb-2">
-              لا توجد دورات أو مودولات متاحة حالياً
-            </h3>
-            <p className="text-slate-500 arabic-text">
-              ستتوفر دورات جديدة قريباً، ترقب التحديثات
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

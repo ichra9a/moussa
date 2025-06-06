@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Play, CheckCircle, Clock } from 'lucide-react';
+import { BookOpen, Play, CheckCircle, Clock, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Module {
@@ -57,7 +57,7 @@ const ModuleSubscription = ({ module, subscription, onSubscriptionUpdate }: Modu
         });
 
       if (error) {
-        if (error.code === '23505') { // Unique constraint violation
+        if (error.code === '23505') {
           toast({
             title: "تنبيه",
             description: "أنت مشترك بالفعل في هذا المودول",
@@ -89,6 +89,8 @@ const ModuleSubscription = ({ module, subscription, onSubscriptionUpdate }: Modu
     if (!subscription || !student) return;
 
     try {
+      const isCompleting = newProgress >= 100 && !subscription.completed_at;
+      
       const { error } = await supabase
         .from('module_subscriptions')
         .update({
@@ -98,13 +100,33 @@ const ModuleSubscription = ({ module, subscription, onSubscriptionUpdate }: Modu
         .eq('id', subscription.id);
 
       if (!error) {
-        onSubscriptionUpdate();
-        if (newProgress >= 100) {
+        // If module is being completed, create achievement
+        if (isCompleting) {
+          await supabase
+            .from('student_achievements')
+            .insert({
+              student_id: student.id,
+              module_id: module.id,
+              achievement_type: 'module_completion'
+            });
+
+          // Send completion notification
+          await supabase
+            .from('notifications')
+            .insert({
+              student_id: student.id,
+              title: 'تهانينا! حصلت على شارة إنجاز',
+              message: `لقد أكملت مودول "${module.title}" بنجاح وحصلت على شارة إنجاز`,
+              type: 'success'
+            });
+
           toast({
-            title: "تهانينا!",
-            description: "لقد أكملت هذا المودول بنجاح",
+            title: "تهانينا! 🎉",
+            description: "لقد أكملت هذا المودول بنجاح وحصلت على شارة إنجاز",
           });
         }
+        
+        onSubscriptionUpdate();
       }
     } catch (error) {
       console.error('Progress update error:', error);
@@ -121,10 +143,16 @@ const ModuleSubscription = ({ module, subscription, onSubscriptionUpdate }: Modu
             className="w-full h-32 object-cover rounded-lg mb-4"
           />
           {subscription?.completed_at && (
-            <Badge className="absolute top-2 right-2 bg-green-500">
-              <CheckCircle size={12} className="ml-1" />
-              مكتمل
-            </Badge>
+            <div className="absolute top-2 right-2 flex gap-1">
+              <Badge className="bg-green-500">
+                <CheckCircle size={12} className="ml-1" />
+                مكتمل
+              </Badge>
+              <Badge className="bg-yellow-500">
+                <Trophy size={12} className="ml-1" />
+                شارة
+              </Badge>
+            </div>
           )}
           {subscription && !subscription.completed_at && (
             <Badge className="absolute top-2 right-2 bg-blue-500">

@@ -60,6 +60,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     checkSession();
+
+    // Listen for auth changes (when user logs in without page refresh)
+    const handleStudentAuthChange = () => {
+      try {
+        const storedStudent = localStorage.getItem('student');
+        if (storedStudent) {
+          const studentData = JSON.parse(storedStudent);
+          setStudent(studentData);
+        }
+      } catch (error) {
+        console.error('Error parsing student data:', error);
+      }
+    };
+
+    const handleCoachAuthChange = () => {
+      try {
+        const storedCoach = localStorage.getItem('coach');
+        if (storedCoach) {
+          const coachData = JSON.parse(storedCoach);
+          setCoach(coachData);
+        }
+      } catch (error) {
+        console.error('Error parsing coach data:', error);
+      }
+    };
+
+    window.addEventListener('student-auth-changed', handleStudentAuthChange);
+    window.addEventListener('coach-auth-changed', handleCoachAuthChange);
+
+    return () => {
+      window.removeEventListener('student-auth-changed', handleStudentAuthChange);
+      window.removeEventListener('coach-auth-changed', handleCoachAuthChange);
+    };
   }, []);
 
   const signOut = async () => {

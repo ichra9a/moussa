@@ -1,0 +1,200 @@
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Bell, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+interface GlobalNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  created_at: string;
+}
+
+const NotificationCenter = () => {
+  const { student } = useAuth();
+  const { toast } = useToast();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [globalNotifications, setGlobalNotifications] = useState<GlobalNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (student) {
+      fetchNotifications();
+      fetchGlobalNotifications();
+    }
+  }, [student]);
+
+  const fetchNotifications = async () => {
+    if (!student) return;
+
+    try {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('created_at', { ascending: false });
+
+      if (data) setNotifications(data);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  const fetchGlobalNotifications = async () => {
+    try {
+      const { data } = await supabase
+        .from('global_notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (data) setGlobalNotifications(data);
+    } catch (error) {
+      console.error('Error fetching global notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (!error) {
+        setNotifications(prev => 
+          prev.map(notif => 
+            notif.id === notificationId ? { ...notif, is_read: true } : notif
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'warning':
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'error':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Bell className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="arabic-heading">الإشعارات</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 arabic-heading">
+          <Bell className="h-5 w-5" />
+          الإشعارات
+          {unreadCount > 0 && (
+            <Badge variant="destructive" className="arabic-text">
+              {unreadCount} جديد
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Global Notifications */}
+        {globalNotifications.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm text-gray-600 arabic-text">إعلانات عامة</h4>
+            {globalNotifications.map((notification) => (
+              <div key={notification.id} className="border rounded-lg p-3 bg-blue-50">
+                <div className="flex items-start gap-2">
+                  {getTypeIcon(notification.type)}
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-sm arabic-text">{notification.title}</h5>
+                    <p className="text-sm text-gray-600 arabic-text mt-1">{notification.message}</p>
+                    <span className="text-xs text-gray-400">
+                      {new Date(notification.created_at).toLocaleDateString('ar')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Personal Notifications */}
+        {notifications.length > 0 ? (
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm text-gray-600 arabic-text">إشعاراتك الشخصية</h4>
+            {notifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                  notification.is_read ? 'bg-gray-50' : 'bg-white border-blue-200'
+                }`}
+                onClick={() => !notification.is_read && markAsRead(notification.id)}
+              >
+                <div className="flex items-start gap-2">
+                  {getTypeIcon(notification.type)}
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-sm arabic-text">{notification.title}</h5>
+                    <p className="text-sm text-gray-600 arabic-text mt-1">{notification.message}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-gray-400">
+                        {new Date(notification.created_at).toLocaleDateString('ar')}
+                      </span>
+                      {!notification.is_read && (
+                        <Badge variant="secondary" className="text-xs">جديد</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-gray-500 py-4 arabic-text">
+            لا توجد إشعارات شخصية
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default NotificationCenter;
