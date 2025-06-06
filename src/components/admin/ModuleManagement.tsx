@@ -90,7 +90,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
           module_videos(
             id,
             order_index,
-            videos(id, title, youtube_id, duration_seconds, thumbnail)
+            videos!module_videos_video_id_fkey(id, title, youtube_id, duration_seconds, thumbnail)
           )
         `)
         .order('order_index');
