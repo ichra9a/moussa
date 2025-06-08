@@ -60,7 +60,6 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   const { toast } = useToast();
   const [modules, setModules] = useState<Module[]>([]);
   const [courses, setCourses] = useState<Course[]>(propCourses || []);
-  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
   const [formData, setFormData] = useState({
@@ -69,17 +68,20 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
     course_id: '',
     order_index: 1
   });
-  const [selectedVideo, setSelectedVideo] = useState('');
-  const [videoOrderIndex, setVideoOrderIndex] = useState(1);
+  const [videoFormData, setVideoFormData] = useState({
+    title: '',
+    youtubeUrl: '',
+    orderIndex: 1
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [addingVideo, setAddingVideo] = useState(false);
 
   useEffect(() => {
     fetchModules();
     if (!propCourses || propCourses.length === 0) {
       fetchCourses();
     }
-    fetchVideos();
   }, [propCourses]);
 
   const fetchModules = async () => {
@@ -126,18 +128,10 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
     }
   };
 
-  const fetchVideos = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('videos')
-        .select('*')
-        .order('title');
-
-      if (error) throw error;
-      setVideos(data || []);
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    }
+  const extractYouTubeId = (url: string): string => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : '';
   };
 
   const getNextOrderIndex = async (courseId: string) => {
@@ -229,33 +223,59 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   };
 
   const handleAddVideoToModule = async (moduleId: string) => {
-    if (!selectedVideo) {
+    if (!videoFormData.title.trim() || !videoFormData.youtubeUrl.trim()) {
       toast({
         title: "خطأ",
-        description: "يجب اختيار فيديو",
+        description: "يجب ملء عنوان الفيديو ورابط اليوتيوب",
         variant: "destructive"
       });
       return;
     }
 
+    const youtubeId = extractYouTubeId(videoFormData.youtubeUrl);
+    if (!youtubeId) {
+      toast({
+        title: "خطأ",
+        description: "رابط يوتيوب غير صحيح",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setAddingVideo(true);
+
     try {
-      const { error } = await supabase
+      // First, create the video
+      const { data: videoData, error: videoError } = await supabase
+        .from('videos')
+        .insert({
+          title: videoFormData.title,
+          youtube_url: videoFormData.youtubeUrl,
+          youtube_id: youtubeId,
+          thumbnail: `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
+        })
+        .select()
+        .single();
+
+      if (videoError) throw videoError;
+
+      // Then, add it to the module
+      const { error: moduleVideoError } = await supabase
         .from('module_videos')
         .insert({
           module_id: moduleId,
-          video_id: selectedVideo,
-          order_index: videoOrderIndex
+          video_id: videoData.id,
+          order_index: videoFormData.orderIndex
         });
 
-      if (error) throw error;
+      if (moduleVideoError) throw moduleVideoError;
 
       toast({
         title: "تم الإضافة",
         description: "تم إضافة الفيديو للوحدة بنجاح"
       });
 
-      setSelectedVideo('');
-      setVideoOrderIndex(1);
+      setVideoFormData({ title: '', youtubeUrl: '', orderIndex: 1 });
       fetchModules();
     } catch (error) {
       console.error('Error adding video to module:', error);
@@ -264,6 +284,8 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
         description: "فشل في إضافة الفيديو",
         variant: "destructive"
       });
+    } finally {
+      setAddingVideo(false);
     }
   };
 
@@ -502,39 +524,53 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   )}
                 </div>
 
-                {/* Add video to module */}
+                {/* Add video from YouTube URL */}
                 <div className="border-t pt-4">
-                  <h5 className="font-medium arabic-text mb-3">إضافة فيديو للوحدة</h5>
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <Select value={selectedVideo} onValueChange={setSelectedVideo}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="اختر فيديو" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {videos.map((video) => (
-                            <SelectItem key={video.id} value={video.id}>
-                              {video.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="w-24">
+                  <h5 className="font-medium arabic-text mb-3">إضافة فيديو من يوتيوب</h5>
+                  <div className="space-y-3">
+                    <div>
                       <Input
-                        type="number"
-                        placeholder="ترتيب"
-                        value={videoOrderIndex}
-                        onChange={(e) => setVideoOrderIndex(parseInt(e.target.value) || 1)}
-                        min="1"
+                        placeholder="عنوان الفيديو"
+                        value={videoFormData.title}
+                        onChange={(e) => setVideoFormData({ ...videoFormData, title: e.target.value })}
+                        className="arabic-text"
+                        disabled={addingVideo}
                       />
                     </div>
-                    <Button
-                      onClick={() => handleAddVideoToModule(module.id)}
-                      disabled={!selectedVideo}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                    <div>
+                      <Input
+                        placeholder="رابط يوتيوب (https://youtube.com/watch?v=...)"
+                        value={videoFormData.youtubeUrl}
+                        onChange={(e) => setVideoFormData({ ...videoFormData, youtubeUrl: e.target.value })}
+                        dir="ltr"
+                        className="text-left"
+                        disabled={addingVideo}
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="w-24">
+                        <Input
+                          type="number"
+                          placeholder="ترتيب"
+                          value={videoFormData.orderIndex}
+                          onChange={(e) => setVideoFormData({ ...videoFormData, orderIndex: parseInt(e.target.value) || 1 })}
+                          min="1"
+                          disabled={addingVideo}
+                        />
+                      </div>
+                      <Button
+                        onClick={() => handleAddVideoToModule(module.id)}
+                        disabled={!videoFormData.title.trim() || !videoFormData.youtubeUrl.trim() || addingVideo}
+                        className="arabic-text"
+                      >
+                        {addingVideo ? 'جاري الإضافة...' : (
+                          <>
+                            <Plus className="h-4 w-4 ml-2" />
+                            إضافة فيديو
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
