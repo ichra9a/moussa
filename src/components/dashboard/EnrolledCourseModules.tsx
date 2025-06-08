@@ -48,39 +48,51 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
     if (!student) return;
 
     try {
-      // Get enrolled courses with modules and videos
+      // First get the courses the student is enrolled in
       const { data: enrollments } = await supabase
         .from('student_enrollments')
+        .select('course_id')
+        .eq('student_id', student.id)
+        .eq('is_active', true);
+
+      if (!enrollments || enrollments.length === 0) {
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      const enrolledCourseIds = enrollments.map(e => e.course_id);
+
+      // Then get course details with modules and videos for enrolled courses only
+      const { data: coursesData } = await supabase
+        .from('courses')
         .select(`
-          course_id,
-          courses!student_enrollments_course_id_fkey (
+          id,
+          title,
+          modules!modules_course_id_fkey (
             id,
             title,
-            modules!modules_course_id_fkey (
-              id,
-              title,
-              description,
+            description,
+            order_index,
+            module_videos (
               order_index,
-              module_videos (
-                order_index,
-                videos!module_videos_video_id_fkey (
-                  id,
-                  title,
-                  youtube_id,
-                  duration_seconds
-                )
+              videos!module_videos_video_id_fkey (
+                id,
+                title,
+                youtube_id,
+                duration_seconds
               )
             )
           )
         `)
-        .eq('student_id', student.id)
+        .in('id', enrolledCourseIds)
         .eq('is_active', true);
 
-      if (enrollments) {
-        const formattedCourses = enrollments.map(enrollment => ({
-          id: enrollment.courses.id,
-          title: enrollment.courses.title,
-          modules: enrollment.courses.modules
+      if (coursesData) {
+        const formattedCourses = coursesData.map(course => ({
+          id: course.id,
+          title: course.title,
+          modules: course.modules
             .map(module => ({
               id: module.id,
               title: module.title,
@@ -102,7 +114,7 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
         setCourses(formattedCourses);
       }
 
-      // Fetch video progress
+      // Fetch video progress and module completions
       await fetchVideoProgress();
       await fetchModuleCompletions();
     } catch (error) {
