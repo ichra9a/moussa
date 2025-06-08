@@ -48,23 +48,48 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
     if (!student) return;
 
     try {
+      console.log('Fetching data for student:', student.id, 'pin:', student.pin_code);
+      
       // First get the courses the student is enrolled in
-      const { data: enrollments } = await supabase
+      const { data: enrollments, error: enrollmentError } = await supabase
         .from('student_enrollments')
         .select('course_id')
         .eq('student_id', student.id)
         .eq('is_active', true);
 
+      console.log('Course enrollments:', enrollments, 'Error:', enrollmentError);
+
       if (!enrollments || enrollments.length === 0) {
+        console.log('No course enrollments found');
         setCourses([]);
         setLoading(false);
         return;
       }
 
       const enrolledCourseIds = enrollments.map(e => e.course_id);
+      console.log('Enrolled course IDs:', enrolledCourseIds);
 
-      // Then get course details with modules and videos for enrolled courses only
-      const { data: coursesData } = await supabase
+      // Get the modules the student is subscribed to
+      const { data: moduleSubscriptions, error: moduleSubError } = await supabase
+        .from('module_subscriptions')
+        .select('module_id')
+        .eq('student_id', student.id)
+        .eq('is_active', true);
+
+      console.log('Module subscriptions:', moduleSubscriptions, 'Error:', moduleSubError);
+
+      if (!moduleSubscriptions || moduleSubscriptions.length === 0) {
+        console.log('No module subscriptions found');
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      const subscribedModuleIds = moduleSubscriptions.map(sub => sub.module_id);
+      console.log('Subscribed module IDs:', subscribedModuleIds);
+
+      // Get course details with only subscribed modules and their videos
+      const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
         .select(`
           id,
@@ -88,11 +113,14 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
         .in('id', enrolledCourseIds)
         .eq('is_active', true);
 
+      console.log('Courses data:', coursesData, 'Error:', coursesError);
+
       if (coursesData) {
         const formattedCourses = coursesData.map(course => ({
           id: course.id,
           title: course.title,
           modules: course.modules
+            .filter(module => subscribedModuleIds.includes(module.id)) // Only include subscribed modules
             .map(module => ({
               id: module.id,
               title: module.title,
@@ -110,7 +138,10 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
                 .sort((a, b) => a.order_index - b.order_index)
             }))
             .sort((a, b) => a.order_index - b.order_index)
-        }));
+        }))
+        .filter(course => course.modules.length > 0); // Only include courses with subscribed modules
+        
+        console.log('Formatted courses:', formattedCourses);
         setCourses(formattedCourses);
       }
 
@@ -343,7 +374,10 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
       </CardHeader>
       <CardContent className="space-y-6">
         {courses.length === 0 ? (
-          <p className="text-gray-500 text-center arabic-text">لم يتم التسجيل في أي كورس بعد</p>
+          <div className="text-center py-8">
+            <p className="text-gray-500 arabic-text">لم يتم العثور على وحدات مشترك بها</p>
+            <p className="text-sm text-gray-400 arabic-text mt-2">تأكد من تسجيلك في الكورس والاشتراك في الوحدات</p>
+          </div>
         ) : (
           courses.map((course) => (
             <div key={course.id} className="space-y-4">
