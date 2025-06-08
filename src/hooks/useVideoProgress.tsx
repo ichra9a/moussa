@@ -47,7 +47,7 @@ export const useVideoProgress = (videoId: string) => {
           video_id: videoId,
           watch_time: currentWatchTime,
           completion_percentage: percentage,
-          completed_at: percentage >= 95 ? new Date().toISOString() : null
+          completed_at: percentage >= 100 ? new Date().toISOString() : null
         });
     } catch (error) {
       console.error('Error saving progress:', error);

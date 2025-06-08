@@ -29,6 +29,14 @@ interface VideoPlayerProps {
   isLastVideoInModule?: boolean;
 }
 
+// Declare YouTube API types
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
+
 const VideoPlayer = ({ 
   video, 
   onVideoComplete, 
@@ -38,11 +46,13 @@ const VideoPlayer = ({
 }: VideoPlayerProps) => {
   const { student } = useAuth();
   const { toast } = useToast();
-  const playerRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(video.duration_seconds || 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchedSufficientTime, setWatchedSufficientTime] = useState(false);
+  const [ytPlayerReady, setYtPlayerReady] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -73,6 +83,120 @@ const VideoPlayer = ({
 
   const { isModuleCompleted, handleModuleComplete } = useModuleCompletion(student, moduleId);
 
+  // Load YouTube API
+  useEffect(() => {
+    if (!window.YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+
+      window.onYouTubeIframeAPIReady = initializePlayer;
+    } else {
+      initializePlayer();
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (playerRef.current && playerRef.current.destroy) {
+        playerRef.current.destroy();
+      }
+    };
+  }, [video.youtube_id]);
+
+  const initializePlayer = () => {
+    if (containerRef.current && !isLocked) {
+      playerRef.current = new window.YT.Player(containerRef.current, {
+        height: '100%',
+        width: '100%',
+        videoId: video.youtube_id,
+        playerVars: {
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+          controls: 0, // Hide YouTube controls
+          disablekb: 1,
+          iv_load_policy: 3,
+          cc_load_policy: 0,
+          fs: 0, // Disable fullscreen
+          autohide: 1,
+          enablejsapi: 1
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+  };
+
+  const onPlayerReady = (event: any) => {
+    setYtPlayerReady(true);
+    const playerDuration = event.target.getDuration();
+    if (playerDuration) {
+      setDuration(playerDuration);
+    }
+  };
+
+  const onPlayerStateChange = (event: any) => {
+    const playerState = event.data;
+    
+    if (playerState === window.YT.PlayerState.PLAYING) {
+      setIsPlaying(true);
+      startTracking();
+    } else if (playerState === window.YT.PlayerState.PAUSED || 
+               playerState === window.YT.PlayerState.ENDED) {
+      setIsPlaying(false);
+      stopTracking();
+    }
+
+    // Check if video ended (100% completion required)
+    if (playerState === window.YT.PlayerState.ENDED) {
+      setCompletionPercentage(100);
+      setWatchedSufficientTime(true);
+      toast({
+        title: "اكتمل المشاهدة!",
+        description: "لقد شاهدت الفيديو كاملاً. يمكنك الآن تحديده كمكتمل",
+      });
+    }
+  };
+
+  const startTracking = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    intervalRef.current = setInterval(() => {
+      if (playerRef.current && playerRef.current.getCurrentTime) {
+        const current = playerRef.current.getCurrentTime();
+        const videoDuration = playerRef.current.getDuration() || duration;
+        
+        setCurrentTime(current);
+        const percentage = videoDuration > 0 ? Math.floor((current / videoDuration) * 100) : 0;
+        setCompletionPercentage(percentage);
+        setWatchTime(prev => prev + 1);
+        
+        // Require 100% completion
+        if (percentage >= 100 && !watchedSufficientTime) {
+          setWatchedSufficientTime(true);
+          console.log('Student has watched 100% of the video, completion button should appear');
+        }
+        
+        if (Math.floor(current) % 10 === 0) {
+          saveProgress(Math.floor(current), percentage);
+        }
+      }
+    }, 1000);
+  };
+
+  const stopTracking = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+  };
+
   useEffect(() => {
     if (student && video.id) {
       checkVideoCompletionStatus();
@@ -80,45 +204,6 @@ const VideoPlayer = ({
       checkWatchedTime();
     }
   }, [student, video.id]);
-
-  useEffect(() => {
-    if (isPlaying && !isCompleted) {
-      intervalRef.current = setInterval(() => {
-        setCurrentTime(prev => {
-          const newTime = prev + 1;
-          const percentage = duration > 0 ? Math.floor((newTime / duration) * 100) : 0;
-          setCompletionPercentage(percentage);
-          setWatchTime(prev => prev + 1);
-          
-          // Check if user has watched at least 70% of the video
-          if (percentage >= 70 && !watchedSufficientTime) {
-            setWatchedSufficientTime(true);
-            console.log('Student has watched 70% of the video, completion button should appear');
-            toast({
-              title: "جاهز للإكمال!",
-              description: "لقد شاهدت 70% من الفيديو. يمكنك الآن تحديده كمكتمل",
-            });
-          }
-          
-          if (newTime % 10 === 0) {
-            saveProgress(newTime, percentage);
-          }
-          
-          return newTime;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isPlaying, duration, isCompleted, watchedSufficientTime]);
 
   const checkVideoCompletionStatus = async () => {
     if (!student || !video.id) return;
@@ -152,9 +237,9 @@ const VideoPlayer = ({
         .eq('video_id', video.id)
         .maybeSingle();
 
-      if (data && data.completion_percentage >= 70) {
+      if (data && data.completion_percentage >= 100) {
         setWatchedSufficientTime(true);
-        console.log('Student has already watched sufficient time for video:', video.id);
+        console.log('Student has already watched full video:', video.id);
       }
     } catch (error) {
       console.error('Error checking watched time:', error);
@@ -199,11 +284,27 @@ const VideoPlayer = ({
       });
       return;
     }
-    setIsPlaying(!isPlaying);
+
+    if (!ytPlayerReady || !playerRef.current) {
+      toast({
+        title: "الفيديو غير جاهز",
+        description: "انتظر حتى يتم تحميل الفيديو",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
+    }
   };
 
   const handleRestart = () => {
-    if (isLocked) return;
+    if (isLocked || !ytPlayerReady || !playerRef.current) return;
+    
+    playerRef.current.seekTo(0);
     setCurrentTime(0);
     setCompletionPercentage(0);
     setIsPlaying(false);
@@ -235,7 +336,8 @@ const VideoPlayer = ({
     isCompleted,
     quizCompleted,
     completionPercentage,
-    showQuiz
+    showQuiz,
+    ytPlayerReady
   });
 
   return (
@@ -253,14 +355,9 @@ const VideoPlayer = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="aspect-video relative">
-            <iframe
-              ref={playerRef}
-              src={`https://www.youtube-nocookie.com/embed/${video.youtube_id}?enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&disablekb=1&iv_load_policy=3&cc_load_policy=0&fs=1&autohide=1`}
+            <div 
+              ref={containerRef}
               className="w-full h-full rounded-lg"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={video.title}
             />
           </div>
 
@@ -279,7 +376,7 @@ const VideoPlayer = ({
             onRestart={handleRestart}
           />
 
-          {/* Video Completion Button - Always render, it handles its own visibility */}
+          {/* Video Completion Button - Only show when 100% watched */}
           <VideoCompletionButton
             watchedSufficientTime={watchedSufficientTime}
             isCompleted={isVideoFullyComplete}

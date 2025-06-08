@@ -20,7 +20,8 @@ export const useVideoCompletion = (
     console.log('handleMarkAsComplete called', { 
       student: !!student, 
       watchedSufficientTime, 
-      videoId: video.id 
+      videoId: video.id,
+      completionPercentage
     });
 
     if (!student) {
@@ -32,10 +33,11 @@ export const useVideoCompletion = (
       return;
     }
 
-    if (!watchedSufficientTime) {
+    // Require 100% completion
+    if (!watchedSufficientTime || completionPercentage < 100) {
       toast({
         title: "تحذير",
-        description: "يجب مشاهدة 70% على الأقل من الفيديو قبل تحديده كمكتمل",
+        description: "يجب مشاهدة الفيديو كاملاً (100%) قبل تحديده كمكتمل",
         variant: "destructive"
       });
       return;
@@ -44,14 +46,14 @@ export const useVideoCompletion = (
     try {
       console.log('Marking video as completed:', video.id);
       
-      // Mark video as completed in database
+      // Mark video as completed in database with 100% completion
       const { error: progressError } = await supabase
         .from('student_video_progress')
         .upsert({
           student_id: student.id,
           video_id: video.id,
-          watch_time: Math.max(watchTime, Math.floor(duration * 0.7)),
-          completion_percentage: Math.max(completionPercentage, 70),
+          watch_time: Math.max(watchTime, duration),
+          completion_percentage: 100, // Force 100% completion
           completed_at: new Date().toISOString()
         });
 
