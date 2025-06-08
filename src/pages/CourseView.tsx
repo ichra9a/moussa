@@ -390,18 +390,4 @@ const CourseView = () => {
   );
 };
 
-function getOverallProgress() {
-  const totalVideos = modules.reduce((sum, module) => sum + module.videos.length, 0);
-  const completedVideos = modules.reduce((sum, module) => 
-    sum + module.videos.filter(video => isVideoFullyCompleted(video.id)).length, 0
-  );
-  
-  return totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
-}
-
-function getModuleProgress(module: Module) {
-  const completedVideos = module.videos.filter(video => isVideoFullyCompleted(video.id)).length;
-  return module.videos.length > 0 ? Math.round((completedVideos / module.videos.length) * 100) : 0;
-}
-
 export default CourseView;

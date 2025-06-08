@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import VideoVerificationForm from './VideoVerificationForm';
+
+interface VerificationQuestion {
+  question_text: string;
+  correct_answer: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+}
 
 interface Video {
   id: string;
