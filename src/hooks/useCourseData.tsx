@@ -11,22 +11,9 @@ interface Video {
   order_index: number;
 }
 
-interface Module {
-  id: string;
-  title: string;
-  description: string;
-  order_index: number;
-  videos: Video[];
-}
-
 interface VideoProgress {
   video_id: string;
   completion_percentage: number;
-  completed_at: string | null;
-}
-
-interface ModuleCompletion {
-  module_id: string;
   completed_at: string | null;
 }
 
@@ -38,9 +25,8 @@ interface QuizCompletion {
 export const useCourseData = (student: any, courseId: string | undefined) => {
   const navigate = useNavigate();
   const [course, setCourse] = useState<any>(null);
-  const [modules, setModules] = useState<Module[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [videoProgress, setVideoProgress] = useState<VideoProgress[]>([]);
-  const [moduleCompletions, setModuleCompletions] = useState<ModuleCompletion[]>([]);
   const [quizCompletions, setQuizCompletions] = useState<QuizCompletion[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,50 +59,18 @@ export const useCourseData = (student: any, courseId: string | undefined) => {
         setCourse(courseData);
       }
 
-      // Fetch modules with videos
-      const { data: modulesData } = await supabase
-        .from('modules')
-        .select(`
-          id,
-          title,
-          description,
-          order_index,
-          module_videos (
-            order_index,
-            videos!fk_module_videos_video (
-              id,
-              title,
-              youtube_id,
-              duration_seconds
-            )
-          )
-        `)
+      // Fetch videos directly from course
+      const { data: videosData } = await supabase
+        .from('videos')
+        .select('id, title, youtube_id, duration_seconds, order_index')
         .eq('course_id', courseId)
-        .eq('is_active', true)
         .order('order_index');
 
-      if (modulesData) {
-        const formattedModules = modulesData.map(module => ({
-          id: module.id,
-          title: module.title,
-          description: module.description,
-          order_index: module.order_index,
-          videos: module.module_videos
-            .filter(mv => mv.videos !== null)
-            .map(mv => ({ 
-              id: mv.videos!.id,
-              title: mv.videos!.title,
-              youtube_id: mv.videos!.youtube_id,
-              duration_seconds: mv.videos!.duration_seconds,
-              order_index: mv.order_index 
-            }))
-            .sort((a, b) => a.order_index - b.order_index)
-        }));
-        setModules(formattedModules);
+      if (videosData) {
+        setVideos(videosData);
       }
 
       await fetchVideoProgress();
-      await fetchModuleCompletions();
       await fetchQuizCompletions();
       
     } catch (error) {
@@ -143,41 +97,22 @@ export const useCourseData = (student: any, courseId: string | undefined) => {
     }
   };
 
-  const fetchModuleCompletions = async () => {
-    if (!student) return;
-
-    try {
-      const { data } = await supabase
-        .from('module_subscriptions')
-        .select('module_id, completed_at')
-        .eq('student_id', student.id);
-
-      if (data) {
-        setModuleCompletions(data);
-      }
-    } catch (error) {
-      console.error('Error fetching module completions:', error);
-    }
-  };
-
   const fetchQuizCompletions = async () => {
     if (!student) return;
 
     try {
-      // Get all videos from modules
-      const allVideos = modules.flatMap(module => module.videos);
-      
-      if (allVideos.length === 0) return;
+      // Get all videos from course
+      if (videos.length === 0) return;
 
       // Get all verification questions for these videos
       const { data: questions } = await supabase
         .from('video_verification_questions')
         .select('id, video_id')
-        .in('video_id', allVideos.map(v => v.id));
+        .in('video_id', videos.map(v => v.id));
 
       if (!questions || questions.length === 0) {
         // No questions exist, mark all videos as quiz completed
-        const completions = allVideos.map(video => ({
+        const completions = videos.map(video => ({
           video_id: video.id,
           completed: true
         }));
@@ -200,7 +135,7 @@ export const useCourseData = (student: any, courseId: string | undefined) => {
         .in('question_id', questions.map(q => q.id));
 
       // Calculate completion status for each video
-      const completions = allVideos.map(video => {
+      const completions = videos.map(video => {
         const videoQuestions = questionsByVideo[video.id] || [];
         
         if (videoQuestions.length === 0) {
@@ -231,9 +166,10 @@ export const useCourseData = (student: any, courseId: string | undefined) => {
 
   return {
     course,
-    modules,
+    modules: [], // Empty since we removed modules
+    videos,
     videoProgress,
-    moduleCompletions,
+    moduleCompletions: [], // Empty since we removed modules
     quizCompletions,
     loading,
     fetchVideoProgress,

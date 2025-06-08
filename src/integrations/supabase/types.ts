@@ -898,10 +898,12 @@ export type Database = {
       videos: {
         Row: {
           category_id: string | null
+          course_id: string | null
           created_at: string
           description: string | null
           duration_seconds: number | null
           id: string
+          order_index: number | null
           thumbnail: string | null
           title: string
           updated_at: string
@@ -911,10 +913,12 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          course_id?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          order_index?: number | null
           thumbnail?: string | null
           title: string
           updated_at?: string
@@ -924,10 +928,12 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          course_id?: string | null
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
           id?: string
+          order_index?: number | null
           thumbnail?: string | null
           title?: string
           updated_at?: string
@@ -941,6 +947,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videos_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
             referencedColumns: ["id"]
           },
         ]

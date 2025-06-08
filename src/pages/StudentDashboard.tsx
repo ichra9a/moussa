@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { LogOut } from 'lucide-react';
 import StatsCards from '@/components/dashboard/StatsCards';
 import StudentProgress from '@/components/dashboard/StudentProgress';
 import ModuleVideos from '@/components/dashboard/ModuleVideos';
-import EnrolledCourseModules from '@/components/dashboard/EnrolledCourseModules';
+import EnrolledCourseVideos from '@/components/dashboard/EnrolledCourseVideos';
 import NotificationCenter from '@/components/NotificationCenter';
 import VideoModal from '@/components/VideoModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,7 +17,7 @@ const StudentDashboard = () => {
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalCourses: 0,
-    completedModules: 0,
+    completedVideos: 0,
     averageProgress: 0
   });
   const [subscriptions, setSubscriptions] = useState([]);
@@ -39,21 +40,21 @@ const StudentDashboard = () => {
         .eq('student_id', student.id)
         .eq('is_active', true);
 
-      // Get student's module subscriptions for progress calculation
-      const { data: moduleSubscriptions, error: moduleError } = await supabase
-        .from('module_subscriptions')
+      // Get student's video progress for completed videos calculation
+      const { data: videoProgress, error: videoError } = await supabase
+        .from('student_video_progress')
         .select('*')
         .eq('student_id', student.id);
 
-      if (!enrollError && !moduleError) {
-        const completedModules = moduleSubscriptions?.filter(sub => sub.completed_at)?.length || 0;
-        const totalProgress = moduleSubscriptions?.reduce((sum, sub) => sum + (sub.progress || 0), 0) || 0;
-        const averageProgress = moduleSubscriptions?.length ? Math.round(totalProgress / moduleSubscriptions.length) : 0;
+      if (!enrollError && !videoError) {
+        const completedVideos = videoProgress?.filter(progress => progress.completed_at)?.length || 0;
+        const totalProgress = videoProgress?.reduce((sum, progress) => sum + (progress.completion_percentage || 0), 0) || 0;
+        const averageProgress = videoProgress?.length ? Math.round(totalProgress / videoProgress.length) : 0;
 
         setStats({
           totalStudents: 1, // Current student
           totalCourses: enrollments?.length || 0,
-          completedModules,
+          completedVideos,
           averageProgress
         });
       }
@@ -66,12 +67,12 @@ const StudentDashboard = () => {
     if (!student) return;
 
     try {
+      // Since we're removing modules, we'll use course enrollments instead
       const { data, error } = await supabase
-        .from('module_subscriptions')
+        .from('student_enrollments')
         .select(`
           *,
-          students(full_name),
-          modules(title)
+          courses(title)
         `)
         .eq('student_id', student.id);
 
@@ -120,11 +121,10 @@ const StudentDashboard = () => {
             <StatsCards 
               totalStudents={stats.totalStudents}
               totalCourses={stats.totalCourses}
-              completedModules={stats.completedModules}
+              completedModules={stats.completedVideos}
               averageProgress={stats.averageProgress}
             />
-            <EnrolledCourseModules onVideoSelect={setSelectedVideo} />
-            <ModuleVideos />
+            <EnrolledCourseVideos onVideoSelect={setSelectedVideo} />
             <StudentProgress subscriptions={subscriptions} />
           </div>
           

@@ -16,6 +16,11 @@ interface Category {
   thumbnail: string | null;
 }
 
+interface Course {
+  id: string;
+  title: string;
+}
+
 interface Video {
   id: string;
   title: string;
@@ -24,6 +29,8 @@ interface Video {
   youtube_id: string;
   thumbnail: string | null;
   category_id: string | null;
+  course_id: string | null;
+  order_index: number | null;
   views: number | null;
   created_at: string;
   updated_at: string;
@@ -41,17 +48,39 @@ const AdminVideoForm = ({ video, categories, onSave, onCancel }: AdminVideoFormP
   const [description, setDescription] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
+  const [courseId, setCourseId] = useState<string>('');
+  const [orderIndex, setOrderIndex] = useState<number>(1);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
+    fetchCourses();
     if (video) {
       setTitle(video.title);
       setDescription(video.description || '');
       setYoutubeUrl(video.youtube_url);
       setCategoryId(video.category_id || '');
+      setCourseId(video.course_id || '');
+      setOrderIndex(video.order_index || 1);
     }
   }, [video]);
+
+  const fetchCourses = async () => {
+    try {
+      const { data } = await supabase
+        .from('courses')
+        .select('id, title')
+        .eq('is_active', true)
+        .order('title');
+      
+      if (data) {
+        setCourses(data);
+      }
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    }
+  };
 
   const extractYouTubeId = (url: string): string => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -76,6 +105,8 @@ const AdminVideoForm = ({ video, categories, onSave, onCancel }: AdminVideoFormP
         youtube_url: youtubeUrl,
         youtube_id: youtubeId,
         category_id: categoryId || null,
+        course_id: courseId || null,
+        order_index: orderIndex,
         updated_at: new Date().toISOString(),
       };
 
@@ -156,6 +187,22 @@ const AdminVideoForm = ({ video, categories, onSave, onCancel }: AdminVideoFormP
           </div>
 
           <div className="space-y-2">
+            <label className="text-sm font-medium arabic-text">الكورس</label>
+            <Select value={courseId} onValueChange={setCourseId}>
+              <SelectTrigger className="arabic-text text-right" dir="rtl">
+                <SelectValue placeholder="اختر الكورس" />
+              </SelectTrigger>
+              <SelectContent>
+                {courses.map((course) => (
+                  <SelectItem key={course.id} value={course.id} className="arabic-text">
+                    {course.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <label className="text-sm font-medium arabic-text">الفئة</label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger className="arabic-text text-right" dir="rtl">
@@ -169,6 +216,18 @@ const AdminVideoForm = ({ video, categories, onSave, onCancel }: AdminVideoFormP
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium arabic-text">ترتيب الفيديو</label>
+            <Input
+              type="number"
+              value={orderIndex}
+              onChange={(e) => setOrderIndex(parseInt(e.target.value) || 1)}
+              min="1"
+              className="text-left"
+              dir="ltr"
+            />
           </div>
 
           <div className="flex gap-2 justify-end">
