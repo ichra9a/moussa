@@ -27,6 +27,8 @@ interface VideoPlayerProps {
   isLocked?: boolean;
   moduleId?: string;
   isLastVideoInModule?: boolean;
+  maxPreviewTime?: number;
+  onPreviewEnd?: () => void;
 }
 
 // Declare YouTube API types
@@ -42,7 +44,9 @@ const VideoPlayer = ({
   onVideoComplete, 
   isLocked = false, 
   moduleId,
-  isLastVideoInModule = false 
+  isLastVideoInModule = false,
+  maxPreviewTime,
+  onPreviewEnd
 }: VideoPlayerProps) => {
   const { student } = useAuth();
   const { toast } = useToast();
@@ -53,6 +57,7 @@ const VideoPlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [watchedSufficientTime, setWatchedSufficientTime] = useState(false);
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
+  const [previewEnded, setPreviewEnded] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -116,13 +121,14 @@ const VideoPlayer = ({
           modestbranding: 1,
           rel: 0,
           showinfo: 0,
-          controls: 0, // Hide YouTube controls
+          controls: 0,
           disablekb: 1,
           iv_load_policy: 3,
           cc_load_policy: 0,
-          fs: 0, // Disable fullscreen
+          fs: 0,
           autohide: 1,
-          enablejsapi: 1
+          enablejsapi: 1,
+          origin: window.location.origin
         },
         events: {
           onReady: onPlayerReady,
@@ -152,14 +158,16 @@ const VideoPlayer = ({
       stopTracking();
     }
 
-    // Check if video ended (100% completion required)
+    // Check if video ended (100% completion required for enrolled users)
     if (playerState === window.YT.PlayerState.ENDED) {
-      setCompletionPercentage(100);
-      setWatchedSufficientTime(true);
-      toast({
-        title: "اكتمل المشاهدة!",
-        description: "لقد شاهدت الفيديو كاملاً. يمكنك الآن تحديده كمكتمل",
-      });
+      if (!maxPreviewTime) {
+        setCompletionPercentage(100);
+        setWatchedSufficientTime(true);
+        toast({
+          title: "اكتمل المشاهدة!",
+          description: "لقد شاهدت الفيديو كاملاً. يمكنك الآن تحديده كمكتمل",
+        });
+      }
     }
   };
 
@@ -173,13 +181,37 @@ const VideoPlayer = ({
         const current = playerRef.current.getCurrentTime();
         const videoDuration = playerRef.current.getDuration() || duration;
         
+        // Check preview time limit
+        if (maxPreviewTime && current >= maxPreviewTime && !previewEnded) {
+          setPreviewEnded(true);
+          playerRef.current.pauseVideo();
+          if (onPreviewEnd) {
+            onPreviewEnd();
+          }
+          toast({
+            title: "انتهت المعاينة المجانية",
+            description: `لقد شاهدت ${Math.floor(maxPreviewTime / 60)} دقائق من الفيديو`,
+            variant: "default"
+          });
+          return;
+        }
+        
         setCurrentTime(current);
-        const percentage = videoDuration > 0 ? Math.floor((current / videoDuration) * 100) : 0;
-        setCompletionPercentage(percentage);
+        
+        let percentage;
+        if (maxPreviewTime) {
+          // For preview, calculate percentage based on preview time
+          percentage = videoDuration > 0 ? Math.floor((current / Math.min(maxPreviewTime, videoDuration)) * 100) : 0;
+        } else {
+          // For full access, calculate percentage based on full duration
+          percentage = videoDuration > 0 ? Math.floor((current / videoDuration) * 100) : 0;
+        }
+        
+        setCompletionPercentage(Math.min(percentage, 100));
         setWatchTime(prev => prev + 1);
         
-        // Require 100% completion
-        if (percentage >= 100 && !watchedSufficientTime) {
+        // Only allow completion for enrolled users (no maxPreviewTime)
+        if (!maxPreviewTime && percentage >= 100 && !watchedSufficientTime) {
           setWatchedSufficientTime(true);
           console.log('Student has watched 100% of the video, completion button should appear');
         }
@@ -279,7 +311,16 @@ const VideoPlayer = ({
     if (isLocked) {
       toast({
         title: "الفيديو مقفل",
-        description: "يجب إكمال الفيديوهات السابقة أولاً",
+        description: "يجب الاشتراك في الدورة أولاً",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (previewEnded) {
+      toast({
+        title: "انتهت المعاينة",
+        description: "اشترك في الدورة لمتابعة المشاهدة",
         variant: "destructive"
       });
       return;
@@ -308,6 +349,7 @@ const VideoPlayer = ({
     setCurrentTime(0);
     setCompletionPercentage(0);
     setIsPlaying(false);
+    setPreviewEnded(false);
   };
 
   if (isLocked) {
@@ -321,7 +363,10 @@ const VideoPlayer = ({
         </CardHeader>
         <CardContent>
           <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500 arabic-text">يجب إكمال الفيديو السابق أولاً</p>
+            <div className="text-center">
+              <Lock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500 arabic-text">يجب الاشتراك في الدورة لمشاهدة هذا الفيديو</p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -329,16 +374,6 @@ const VideoPlayer = ({
   }
 
   const isVideoFullyComplete = isCompleted && quizCompleted;
-
-  console.log('Video Player State:', {
-    videoId: video.id,
-    watchedSufficientTime,
-    isCompleted,
-    quizCompleted,
-    completionPercentage,
-    showQuiz,
-    ytPlayerReady
-  });
 
   return (
     <div className="space-y-4">
@@ -351,6 +386,11 @@ const VideoPlayer = ({
               <div className="w-5 h-5 bg-blue-500 rounded-full" />
             )}
             {video.title}
+            {maxPreviewTime && (
+              <span className="text-sm bg-amber-100 text-amber-800 px-2 py-1 rounded">
+                معاينة مجانية
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -359,13 +399,23 @@ const VideoPlayer = ({
               ref={containerRef}
               className="w-full h-full rounded-lg"
             />
+            {previewEnded && (
+              <div className="absolute inset-0 bg-black bg-opacity-75 rounded-lg flex items-center justify-center">
+                <div className="text-center text-white">
+                  <Lock className="w-16 h-16 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold mb-2 arabic-heading">انتهت المعاينة المجانية</h3>
+                  <p className="arabic-text">اشترك في الدورة لمشاهدة الفيديو كاملاً</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <VideoProgress
             completionPercentage={completionPercentage}
             currentTime={currentTime}
-            duration={duration}
+            duration={maxPreviewTime ? Math.min(maxPreviewTime, duration) : duration}
             watchTime={watchTime}
+            maxPreviewTime={maxPreviewTime}
           />
 
           <VideoControls
@@ -374,14 +424,17 @@ const VideoPlayer = ({
             isLocked={isLocked}
             onPlayPause={handlePlayPause}
             onRestart={handleRestart}
+            previewEnded={previewEnded}
           />
 
-          {/* Video Completion Button - Only show when 100% watched */}
-          <VideoCompletionButton
-            watchedSufficientTime={watchedSufficientTime}
-            isCompleted={isVideoFullyComplete}
-            onMarkAsComplete={handleMarkAsComplete}
-          />
+          {/* Video Completion Button - Only show for enrolled users who watched 100% */}
+          {!maxPreviewTime && (
+            <VideoCompletionButton
+              watchedSufficientTime={watchedSufficientTime}
+              isCompleted={isVideoFullyComplete}
+              onMarkAsComplete={handleMarkAsComplete}
+            />
+          )}
 
           {isLastVideoInModule && isVideoFullyComplete && !isModuleCompleted && (
             <ModuleCompletion onComplete={handleModuleComplete} />

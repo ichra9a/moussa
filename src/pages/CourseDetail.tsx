@@ -6,20 +6,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, BookOpen, Play, Clock, Users, CheckCircle } from 'lucide-react';
+import { ArrowRight, BookOpen, Play, Clock, Users, CheckCircle, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import VideoPlayer from '@/components/VideoPlayer';
+
+interface Video {
+  id: string;
+  title: string;
+  duration_seconds: number;
+  youtube_id: string;
+  order_index: number;
+}
 
 interface Module {
   id: string;
   title: string;
   description: string;
   order_index: number;
-  videos: Array<{
-    id: string;
-    title: string;
-    duration_seconds: number;
-    youtube_id: string;
-  }>;
+  videos: Video[];
 }
 
 interface Course {
@@ -37,9 +41,11 @@ const CourseDetail = () => {
   const { toast } = useToast();
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
+  const [allVideos, setAllVideos] = useState<Video[]>([]);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
   useEffect(() => {
     if (courseId) {
@@ -70,7 +76,27 @@ const CourseDetail = () => {
 
       setCourse(courseData);
 
-      // Fetch modules with videos
+      // Fetch all videos directly from the course
+      const { data: videosData, error: videosError } = await supabase
+        .from('videos')
+        .select('id, title, youtube_id, duration_seconds, order_index')
+        .eq('course_id', courseId)
+        .order('order_index');
+
+      if (videosError) {
+        console.error('Error fetching videos:', videosError);
+        return;
+      }
+
+      if (videosData) {
+        setAllVideos(videosData);
+        // Set first video as selected by default
+        if (videosData.length > 0) {
+          setSelectedVideo(videosData[0].id);
+        }
+      }
+
+      // Fetch modules with videos (for display purposes)
       const { data: modulesData, error: modulesError } = await supabase
         .from('modules')
         .select(`
@@ -109,10 +135,10 @@ const CourseDetail = () => {
               id: mv.videos!.id,
               title: mv.videos!.title,
               duration_seconds: mv.videos!.duration_seconds || 0,
-              youtube_id: mv.videos!.youtube_id
+              youtube_id: mv.videos!.youtube_id,
+              order_index: mv.order_index || 0
             }))
-            ?.sort((a, b) => (module.module_videos?.find(mv => mv.videos?.id === a.id)?.order_index || 0) - 
-                             (module.module_videos?.find(mv => mv.videos?.id === b.id)?.order_index || 0)) || []
+            ?.sort((a, b) => a.order_index - b.order_index) || []
         }));
 
         setModules(formattedModules);
@@ -195,17 +221,14 @@ const CourseDetail = () => {
   };
 
   const getTotalDuration = () => {
-    const totalSeconds = modules.reduce((sum, module) => 
-      sum + module.videos.reduce((moduleSum, video) => moduleSum + video.duration_seconds, 0), 0
-    );
+    const totalSeconds = allVideos.reduce((sum, video) => sum + video.duration_seconds, 0);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     return hours > 0 ? `${hours} ساعة و ${minutes} دقيقة` : `${minutes} دقيقة`;
   };
 
-  const getTotalVideos = () => {
-    return modules.reduce((sum, module) => sum + module.videos.length, 0);
-  };
+  const selectedVideoData = allVideos.find(v => v.id === selectedVideo);
+  const isFirstVideo = selectedVideoData && allVideos[0]?.id === selectedVideoData.id;
 
   if (loading) {
     return (
@@ -251,8 +274,9 @@ const CourseDetail = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Course Info */}
+          {/* Course Info and Video Player */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Course Info */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row gap-6">
@@ -275,7 +299,7 @@ const CourseDetail = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <Play size={16} />
-                        <span className="arabic-text">{getTotalVideos()} فيديو</span>
+                        <span className="arabic-text">{allVideos.length} فيديو</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock size={16} />
@@ -287,50 +311,92 @@ const CourseDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Modules */}
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-gray-900 arabic-heading">محتوى الدورة</h2>
-              {modules.map((module, index) => (
-                <Card key={module.id}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-3 arabic-heading">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-bold">{index + 1}</span>
-                      </div>
-                      {module.title}
-                    </CardTitle>
-                    {module.description && (
-                      <p className="text-gray-600 arabic-text">{module.description}</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {module.videos.map((video, videoIndex) => (
-                        <div key={video.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                              <Play className="h-3 w-3 text-gray-600" />
+            {/* Video Player */}
+            {selectedVideoData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="arabic-heading">معاينة الفيديو</CardTitle>
+                  {!isEnrolled && !isFirstVideo && (
+                    <p className="text-sm text-amber-600 arabic-text">
+                      هذا الفيديو متاح للمشتركين فقط
+                    </p>
+                  )}
+                  {!isEnrolled && isFirstVideo && (
+                    <p className="text-sm text-blue-600 arabic-text">
+                      معاينة مجانية - دقيقتان فقط
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <VideoPlayer
+                    video={selectedVideoData}
+                    onVideoComplete={() => {}}
+                    isLocked={!isEnrolled && !isFirstVideo}
+                    maxPreviewTime={!isEnrolled && isFirstVideo ? 120 : undefined}
+                    onPreviewEnd={() => {
+                      toast({
+                        title: "انتهت المعاينة المجانية",
+                        description: "اشترك في الدورة لمشاهدة الفيديو كاملاً",
+                        variant: "default"
+                      });
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* All Videos List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="arabic-heading">جميع فيديوهات الدورة</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {allVideos.map((video, index) => (
+                    <div 
+                      key={video.id} 
+                      className={`flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors ${
+                        selectedVideo === video.id 
+                          ? 'bg-blue-50 border-blue-200' 
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
+                      onClick={() => setSelectedVideo(video.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          {!isEnrolled && index > 0 ? (
+                            <div className="w-16 h-12 bg-gray-300 rounded flex items-center justify-center">
+                              <Lock className="h-4 w-4 text-gray-600" />
                             </div>
-                            <div>
-                              <p className="font-medium arabic-text">{video.title}</p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <Clock className="h-3 w-3" />
-                                <span>{formatDuration(video.duration_seconds)}</span>
-                              </div>
+                          ) : (
+                            <div className="w-16 h-12 bg-blue-100 rounded flex items-center justify-center">
+                              <Play className="h-4 w-4 text-blue-600" />
                             </div>
-                          </div>
-                          {!isEnrolled && (
-                            <Badge variant="secondary" className="arabic-text">
-                              يتطلب التسجيل
-                            </Badge>
+                          )}
+                          {index === 0 && !isEnrolled && (
+                            <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1 rounded">
+                              مجاني
+                            </div>
                           )}
                         </div>
-                      ))}
+                        <div>
+                          <p className="font-medium arabic-text">{video.title}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatDuration(video.duration_seconds)}</span>
+                            {!isEnrolled && index > 0 && (
+                              <Badge variant="secondary" className="arabic-text text-xs">
+                                مقفل
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}
@@ -355,6 +421,13 @@ const CourseDetail = () => {
                     </>
                   ) : (
                     <>
+                      <div className="mb-4">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                          <p className="text-sm text-amber-800 arabic-text">
+                            يمكنك مشاهدة دقيقتين من الفيديو الأول مجاناً
+                          </p>
+                        </div>
+                      </div>
                       <Button
                         onClick={handleEnroll}
                         disabled={enrolling}
@@ -365,7 +438,7 @@ const CourseDetail = () => {
                         <Users size={18} className="mr-2" />
                       </Button>
                       <p className="text-sm text-gray-500 arabic-text">
-                        ستحصل على وصول فوري لجميع المودولات والفيديوهات
+                        ستحصل على وصول فوري لجميع الفيديوهات
                       </p>
                     </>
                   )}

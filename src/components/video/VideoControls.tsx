@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, CheckCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, CheckCircle, Lock } from 'lucide-react';
 
 interface VideoControlsProps {
   isPlaying: boolean;
@@ -8,6 +8,7 @@ interface VideoControlsProps {
   isLocked: boolean;
   onPlayPause: () => void;
   onRestart: () => void;
+  previewEnded?: boolean;
 }
 
 const VideoControls = ({ 
@@ -15,38 +16,48 @@ const VideoControls = ({
   isCompleted, 
   isLocked, 
   onPlayPause, 
-  onRestart 
+  onRestart,
+  previewEnded = false
 }: VideoControlsProps) => {
   return (
-    <div className="flex gap-2">
+    <div className="flex items-center gap-3">
       <Button
-        size="sm"
         onClick={onPlayPause}
-        className="arabic-text"
-      >
-        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        {isPlaying ? 'إيقاف' : 'تشغيل'}
-      </Button>
-      <Button
+        disabled={isLocked || previewEnded}
+        variant={isLocked || previewEnded ? "secondary" : "default"}
         size="sm"
-        variant="outline"
-        onClick={onRestart}
-        className="arabic-text"
-        disabled={isLocked}
+        className="flex items-center gap-2"
       >
-        <RotateCcw className="h-4 w-4" />
-        إعادة
+        {isLocked ? (
+          <Lock size={16} />
+        ) : previewEnded ? (
+          <Lock size={16} />
+        ) : isPlaying ? (
+          <Pause size={16} />
+        ) : (
+          <Play size={16} />
+        )}
+        <span className="arabic-text">
+          {isLocked ? 'مقفل' : previewEnded ? 'انتهت المعاينة' : isPlaying ? 'إيقاف' : 'تشغيل'}
+        </span>
       </Button>
+
+      <Button
+        onClick={onRestart}
+        disabled={isLocked}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-2"
+      >
+        <RotateCcw size={16} />
+        <span className="arabic-text">إعادة التشغيل</span>
+      </Button>
+
       {isCompleted && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="arabic-text bg-green-50 text-green-700"
-          disabled
-        >
-          <CheckCircle className="h-4 w-4" />
-          مكتمل
-        </Button>
+        <div className="flex items-center gap-2 text-green-600">
+          <CheckCircle size={16} />
+          <span className="text-sm arabic-text">مكتمل</span>
+        </div>
       )}
     </div>
   );
