@@ -89,7 +89,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
         .select(`
           *,
           courses!modules_course_id_fkey(title),
-          module_videos(
+          module_videos!module_videos_module_id_fkey(
             id,
             order_index,
             videos!module_videos_video_id_fkey(id, title, youtube_id, duration_seconds, thumbnail)
