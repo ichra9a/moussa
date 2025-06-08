@@ -90,7 +90,7 @@ const NotificationManagement = () => {
         .from('notifications')
         .select(`
           *,
-          students!notifications_student_id_fkey(full_name)
+          students(full_name)
         `)
         .order('created_at', { ascending: false });
 
