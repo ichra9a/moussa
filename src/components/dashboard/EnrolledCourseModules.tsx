@@ -1,178 +1,324 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Clock, PlayCircle } from 'lucide-react';
+import { Play, Lock, CheckCircle, Clock } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import VideoPlayer from '@/components/VideoPlayer';
+import VideoCompletionButton from '@/components/video/VideoCompletionButton';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { useVideoCompletion } from '@/hooks/useVideoCompletion';
+
+interface Video {
+  id: string;
+  title: string;
+  youtube_id: string;
+  duration_seconds: number;
+  order_index: number;
+}
 
 interface Module {
   id: string;
   title: string;
   description: string;
   order_index: number;
-  course: {
-    id: string;
-    title: string;
-  };
-  module_videos: Array<{
-    video: {
-      id: string;
-      title: string;
-      duration_seconds: number;
-      youtube_id: string;
-      thumbnail?: string;
-    };
-  }>;
+  videos: Video[];
+}
+
+interface Course {
+  id: string;
+  title: string;
+  modules: Module[];
 }
 
 interface EnrolledCourseModulesProps {
-  onVideoSelect: (video: any) => void;
+  onVideoSelect?: (video: any) => void;
 }
 
 const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) => {
   const { student } = useAuth();
-  const [modules, setModules] = useState<Module[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedVideo, setExpandedVideo] = useState<string | null>(null);
+  const [videoProgress, setVideoProgress] = useState<Record<string, any>>({});
+  const [moduleCompletions, setModuleCompletions] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (student) {
-      fetchEnrolledModules();
-    }
-  }, [student]);
-
-  const fetchEnrolledModules = async () => {
+  const fetchEnrolledCourses = async () => {
     if (!student) return;
 
     try {
-      // Get enrolled courses
-      const { data: enrollments, error: enrollError } = await supabase
+      // Get enrolled courses with modules and videos
+      const { data: enrollments } = await supabase
         .from('student_enrollments')
-        .select('course_id')
+        .select(`
+          course_id,
+          courses!inner (
+            id,
+            title,
+            modules!inner (
+              id,
+              title,
+              description,
+              order_index,
+              module_videos (
+                order_index,
+                videos!inner (
+                  id,
+                  title,
+                  youtube_id,
+                  duration_seconds
+                )
+              )
+            )
+          )
+        `)
         .eq('student_id', student.id)
         .eq('is_active', true);
 
-      if (enrollError) {
-        console.error('Error fetching enrollments:', enrollError);
-        return;
-      }
-
-      if (!enrollments || enrollments.length === 0) {
-        setModules([]);
-        return;
-      }
-
-      const courseIds = enrollments.map(e => e.course_id);
-
-      // Get modules for enrolled courses with proper join syntax
-      const { data: modulesData, error: modulesError } = await supabase
-        .from('modules')
-        .select(`
-          id,
-          title,
-          description,
-          order_index,
-          course_id,
-          courses!modules_course_id_fkey(
-            id,
-            title
-          )
-        `)
-        .in('course_id', courseIds)
-        .eq('is_active', true)
-        .order('order_index');
-
-      if (modulesError) {
-        console.error('Error fetching modules:', modulesError);
-        return;
-      }
-
-      if (modulesData) {
-        // Get module videos separately to avoid complex joins
-        const moduleIds = modulesData.map(m => m.id);
-        
-        const { data: moduleVideosData, error: videosError } = await supabase
-          .from('module_videos')
-          .select(`
-            module_id,
-            videos!module_videos_video_id_fkey(
-              id,
-              title,
-              duration_seconds,
-              youtube_id,
-              thumbnail
-            )
-          `)
-          .in('module_id', moduleIds)
-          .order('order_index');
-
-        if (videosError) {
-          console.error('Error fetching module videos:', videosError);
-        }
-
-        // Combine modules with their videos
-        const formattedModules = modulesData.map(module => ({
-          ...module,
-          course: {
-            id: module.courses?.id || '',
-            title: module.courses?.title || ''
-          },
-          module_videos: moduleVideosData
-            ?.filter(mv => mv.module_id === module.id)
-            ?.map(mv => ({
-              video: {
-                id: mv.videos?.id || '',
-                title: mv.videos?.title || '',
-                duration_seconds: mv.videos?.duration_seconds || 0,
-                youtube_id: mv.videos?.youtube_id || '',
-                thumbnail: mv.videos?.thumbnail
-              }
-            })) || []
+      if (enrollments) {
+        const formattedCourses = enrollments.map(enrollment => ({
+          id: enrollment.courses.id,
+          title: enrollment.courses.title,
+          modules: enrollment.courses.modules
+            .map(module => ({
+              id: module.id,
+              title: module.title,
+              description: module.description,
+              order_index: module.order_index,
+              videos: module.module_videos
+                .filter(mv => mv.videos)
+                .map(mv => ({
+                  id: mv.videos.id,
+                  title: mv.videos.title,
+                  youtube_id: mv.videos.youtube_id,
+                  duration_seconds: mv.videos.duration_seconds,
+                  order_index: mv.order_index
+                }))
+                .sort((a, b) => a.order_index - b.order_index)
+            }))
+            .sort((a, b) => a.order_index - b.order_index)
         }));
-
-        setModules(formattedModules);
+        setCourses(formattedCourses);
       }
+
+      // Fetch video progress
+      await fetchVideoProgress();
+      await fetchModuleCompletions();
     } catch (error) {
-      console.error('Error in fetchEnrolledModules:', error);
+      console.error('Error fetching enrolled courses:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const fetchVideoProgress = async () => {
+    if (!student) return;
+
+    try {
+      const { data } = await supabase
+        .from('student_video_progress')
+        .select('video_id, completion_percentage, completed_at, watch_time')
+        .eq('student_id', student.id);
+
+      if (data) {
+        const progressMap = data.reduce((acc, progress) => {
+          acc[progress.video_id] = progress;
+          return acc;
+        }, {} as Record<string, any>);
+        setVideoProgress(progressMap);
+      }
+    } catch (error) {
+      console.error('Error fetching video progress:', error);
+    }
   };
+
+  const fetchModuleCompletions = async () => {
+    if (!student) return;
+
+    try {
+      const { data } = await supabase
+        .from('module_subscriptions')
+        .select('module_id, completed_at')
+        .eq('student_id', student.id);
+
+      if (data) {
+        const completionsMap = data.reduce((acc, completion) => {
+          acc[completion.module_id] = !!completion.completed_at;
+          return acc;
+        }, {} as Record<string, boolean>);
+        setModuleCompletions(completionsMap);
+      }
+    } catch (error) {
+      console.error('Error fetching module completions:', error);
+    }
+  };
+
+  const isVideoCompleted = (videoId: string) => {
+    const progress = videoProgress[videoId];
+    return progress?.completed_at !== null && progress?.completion_percentage >= 70;
+  };
+
+  const isVideoUnlocked = (course: Course, moduleIndex: number, videoIndex: number) => {
+    // First module and first video are always unlocked
+    if (moduleIndex === 0 && videoIndex === 0) return true;
+    
+    // Check if previous video is completed
+    if (videoIndex > 0) {
+      const module = course.modules[moduleIndex];
+      const previousVideo = module.videos[videoIndex - 1];
+      return isVideoCompleted(previousVideo.id);
+    }
+    
+    // Check if previous module is completed
+    if (moduleIndex > 0) {
+      const previousModule = course.modules[moduleIndex - 1];
+      return moduleCompletions[previousModule.id];
+    }
+    
+    return false;
+  };
+
+  const onVideoComplete = async (videoId: string) => {
+    await fetchVideoProgress();
+    await fetchModuleCompletions();
+  };
+
+  const VideoItem = ({ 
+    video, 
+    course, 
+    moduleIndex, 
+    videoIndex, 
+    moduleId 
+  }: { 
+    video: Video; 
+    course: Course; 
+    moduleIndex: number; 
+    videoIndex: number;
+    moduleId: string;
+  }) => {
+    const isUnlocked = isVideoUnlocked(course, moduleIndex, videoIndex);
+    const isCompleted = isVideoCompleted(video.id);
+    const progress = videoProgress[video.id];
+    const completionPercentage = progress?.completion_percentage || 0;
+    const watchTime = progress?.watch_time || 0;
+    
+    const {
+      watchTime: currentWatchTime,
+      completionPercentage: currentCompletionPercentage,
+      isCompleted: isVideoProgressCompleted
+    } = useVideoProgress(video.id);
+
+    const watchedSufficientTime = (currentCompletionPercentage || completionPercentage) >= 70;
+
+    const {
+      handleMarkAsComplete
+    } = useVideoCompletion(
+      student,
+      video,
+      watchedSufficientTime,
+      currentWatchTime || watchTime,
+      currentCompletionPercentage || completionPercentage,
+      video.duration_seconds || 0,
+      onVideoComplete
+    );
+
+    const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <div className="border rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {!isUnlocked && <Lock size={16} className="text-slate-400" />}
+            {isCompleted && <CheckCircle size={16} className="text-green-500" />}
+            <h4 className="font-medium arabic-text">{video.title}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {video.duration_seconds && (
+              <span className="text-sm text-gray-500">
+                {formatTime(video.duration_seconds)}
+              </span>
+            )}
+            <Button
+              onClick={() => {
+                if (isUnlocked) {
+                  setExpandedVideo(expandedVideo === video.id ? null : video.id);
+                }
+              }}
+              disabled={!isUnlocked}
+              variant="outline"
+              size="sm"
+              className={`${
+                !isUnlocked 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+              }`}
+            >
+              <Play size={16} />
+            </Button>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {(currentCompletionPercentage || completionPercentage) > 0 && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>التقدم</span>
+              <span>{currentCompletionPercentage || completionPercentage}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div 
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${currentCompletionPercentage || completionPercentage}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Video Completion Button - Always visible */}
+        <VideoCompletionButton
+          watchedSufficientTime={watchedSufficientTime}
+          isCompleted={isCompleted}
+          onMarkAsComplete={handleMarkAsComplete}
+        />
+
+        {/* Expanded Video Player */}
+        {expandedVideo === video.id && isUnlocked && (
+          <div className="mt-4">
+            <VideoPlayer
+              video={video}
+              onVideoComplete={onVideoComplete}
+              isLocked={false}
+              moduleId={moduleId}
+              isLastVideoInModule={videoIndex === course.modules.find(m => m.id === moduleId)?.videos.length! - 1}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (student) {
+      fetchEnrolledCourses();
+    }
+  }, [student]);
 
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="arabic-heading">وحدات الدورات المسجل بها</CardTitle>
+          <CardTitle className="arabic-heading">الكورسات المسجل بها</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (modules.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="arabic-heading">وحدات الدورات المسجل بها</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 arabic-text">لم تسجل في أي دورات بعد</p>
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-500 arabic-text">جاري التحميل...</p>
           </div>
         </CardContent>
       </Card>
@@ -182,77 +328,47 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 arabic-heading">
-          <BookOpen className="h-5 w-5" />
-          وحدات الدورات المسجل بها
-        </CardTitle>
+        <CardTitle className="arabic-heading">الكورسات المسجل بها</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {modules.map((module) => (
-          <div key={module.id} className="border rounded-lg p-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="secondary" className="arabic-text">
-                    {module.course.title}
-                  </Badge>
-                  <Badge variant="outline" className="arabic-text">
-                    الوحدة {module.order_index}
-                  </Badge>
-                </div>
-                <h4 className="font-semibold arabic-text">{module.title}</h4>
-                {module.description && (
-                  <p className="text-sm text-gray-600 arabic-text mt-1">
-                    {module.description}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {module.module_videos && module.module_videos.length > 0 && (
-              <div className="space-y-2">
-                <h5 className="text-sm font-medium text-gray-700 arabic-text">
-                  فيديوهات الوحدة ({module.module_videos.length})
-                </h5>
-                <div className="grid gap-2">
-                  {module.module_videos.map((moduleVideo, index) => (
-                    <div
-                      key={moduleVideo.video.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <PlayCircle className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium arabic-text">
-                            {moduleVideo.video.title}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <Clock className="h-3 w-3" />
-                            <span>{formatDuration(moduleVideo.video.duration_seconds || 0)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onVideoSelect({
-                          id: moduleVideo.video.youtube_id,
-                          title: moduleVideo.video.title,
-                          thumbnail: moduleVideo.video.thumbnail || ''
-                        })}
-                        className="arabic-text"
-                      >
-                        مشاهدة
-                      </Button>
+      <CardContent className="space-y-6">
+        {courses.length === 0 ? (
+          <p className="text-gray-500 text-center arabic-text">لم يتم التسجيل في أي كورس بعد</p>
+        ) : (
+          courses.map((course) => (
+            <div key={course.id} className="space-y-4">
+              <h3 className="text-lg font-semibold arabic-heading">{course.title}</h3>
+              {course.modules.map((module, moduleIndex) => {
+                const completedVideos = module.videos.filter(video => isVideoCompleted(video.id)).length;
+                
+                return (
+                  <div key={module.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium arabic-heading">
+                        المودول {moduleIndex + 1}: {module.title}
+                      </h4>
+                      <Badge variant={moduleCompletions[module.id] ? 'default' : 'secondary'}>
+                        {completedVideos}/{module.videos.length} فيديو
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+                    
+                    <div className="space-y-3">
+                      {module.videos.map((video, videoIndex) => (
+                        <VideoItem
+                          key={video.id}
+                          video={video}
+                          course={course}
+                          moduleIndex={moduleIndex}
+                          videoIndex={videoIndex}
+                          moduleId={module.id}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
       </CardContent>
     </Card>
   );
