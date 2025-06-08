@@ -1,47 +1,41 @@
-
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
-
 const ContactSection = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     message: ''
   });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Handle form submission here
     console.log('Form submitted:', formData);
     // Reset form
-    setFormData({ name: '', email: '', message: '' });
+    setFormData({
+      name: '',
+      email: '',
+      message: ''
+    });
   };
-
-  const contactInfo = [
-    {
-      icon: Mail,
-      title: 'البريد الإلكتروني',
-      info: 'info@trainingplatform.com',
-      link: 'mailto:info@trainingplatform.com'
-    },
-    {
-      icon: Phone,
-      title: 'رقم الهاتف',
-      info: '+966 12 345 6789',
-      link: 'tel:+966123456789'
-    },
-    {
-      icon: MapPin,
-      title: 'العنوان',
-      info: 'الرياض، المملكة العربية السعودية',
-      link: '#'
-    }
-  ];
-
-  return (
-    <section id="contact" className="py-20 bg-white mobile-app">
+  const contactInfo = [{
+    icon: Mail,
+    title: 'البريد الإلكتروني',
+    info: 'info@trainingplatform.com',
+    link: 'mailto:info@trainingplatform.com'
+  }, {
+    icon: Phone,
+    title: 'رقم الهاتف',
+    info: '+966 12 345 6789',
+    link: 'tel:+966123456789'
+  }, {
+    icon: MapPin,
+    title: 'العنوان',
+    info: 'الرياض، المملكة العربية السعودية',
+    link: '#'
+  }];
+  return <section id="contact" className="py-20 bg-white mobile-app">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-slate-900 arabic-heading mb-6">
@@ -61,25 +55,19 @@ const ContactSection = () => {
             </h3>
             
             <div className="space-y-6">
-              {contactInfo.map((item, index) => (
-                <a
-                  key={index}
-                  href={item.link}
-                  className="flex items-center p-6 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all duration-200 mobile-card group"
-                >
+              {contactInfo.map((item, index) => <a key={index} href={item.link} className="flex items-center p-6 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-all duration-200 mobile-card group">
                   <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center ml-4 group-hover:bg-blue-200 transition-colors">
                     <item.icon className="w-7 h-7 text-blue-600" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-slate-900 arabic-heading mb-1">
+                    <h4 className="text-slate-900 arabic-heading mb-1 text-justify px-0 mx-0 font-bold">
                       {item.title}
                     </h4>
                     <p className="text-slate-600 arabic-text">
                       {item.info}
                     </p>
                   </div>
-                </a>
-              ))}
+                </a>)}
             </div>
 
             {/* Working Hours */}
@@ -115,49 +103,33 @@ const ContactSection = () => {
                 <label className="block text-slate-700 arabic-text font-medium mb-2">
                   الاسم الكامل
                 </label>
-                <Input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="أدخل اسمك الكامل"
-                  className="w-full h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-200 arabic-text mobile-touch"
-                  required
-                />
+                <Input type="text" value={formData.name} onChange={e => setFormData({
+                ...formData,
+                name: e.target.value
+              })} placeholder="أدخل اسمك الكامل" className="w-full h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-200 arabic-text mobile-touch" required />
               </div>
               
               <div>
                 <label className="block text-slate-700 arabic-text font-medium mb-2">
                   البريد الإلكتروني
                 </label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="أدخل بريدك الإلكتروني"
-                  className="w-full h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-200"
-                  dir="ltr"
-                  required
-                />
+                <Input type="email" value={formData.email} onChange={e => setFormData({
+                ...formData,
+                email: e.target.value
+              })} placeholder="أدخل بريدك الإلكتروني" className="w-full h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-200" dir="ltr" required />
               </div>
               
               <div>
                 <label className="block text-slate-700 arabic-text font-medium mb-2">
                   الرسالة
                 </label>
-                <textarea
-                  value={formData.message}
-                  onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  placeholder="اكتب رسالتك هنا..."
-                  rows={5}
-                  className="w-full rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-200 p-4 arabic-text resize-none"
-                  required
-                />
+                <textarea value={formData.message} onChange={e => setFormData({
+                ...formData,
+                message: e.target.value
+              })} placeholder="اكتب رسالتك هنا..." rows={5} className="w-full rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-blue-200 p-4 arabic-text resize-none" required />
               </div>
               
-              <Button 
-                type="submit" 
-                className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white arabic-text font-semibold rounded-xl mobile-button flex items-center justify-center gap-2"
-              >
+              <Button type="submit" className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white arabic-text font-semibold rounded-xl mobile-button flex items-center justify-center gap-2">
                 <Send className="w-5 h-5" />
                 إرسال الرسالة
               </Button>
@@ -165,8 +137,6 @@ const ContactSection = () => {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>;
 };
-
 export default ContactSection;

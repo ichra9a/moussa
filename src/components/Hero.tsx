@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -121,7 +120,7 @@ const Hero = ({
           <div className="relative">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group" onClick={() => onVideoSelect(featuredVideo)}>
               <img src={featuredVideo.thumbnail} alt={featuredVideo.title} className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center my-0">
                 <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
                   <Play size={24} className="text-blue-600 mr-1" />
                 </div>
