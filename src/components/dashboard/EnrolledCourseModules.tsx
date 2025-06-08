@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,17 +53,17 @@ const EnrolledCourseModules = ({ onVideoSelect }: EnrolledCourseModulesProps) =>
         .from('student_enrollments')
         .select(`
           course_id,
-          courses!inner (
+          courses!student_enrollments_course_id_fkey (
             id,
             title,
-            modules!inner (
+            modules!modules_course_id_fkey (
               id,
               title,
               description,
               order_index,
               module_videos (
                 order_index,
-                videos!inner (
+                videos!module_videos_video_id_fkey (
                   id,
                   title,
                   youtube_id,
