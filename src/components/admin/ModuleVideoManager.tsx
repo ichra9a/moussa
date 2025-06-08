@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,12 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
     );
   };
 
+  const getNextAvailableOrderIndex = () => {
+    if (!moduleVideos || moduleVideos.length === 0) return 1;
+    const maxOrder = Math.max(...moduleVideos.map(mv => mv.order_index));
+    return maxOrder + 1;
+  };
+
   const handleAddVideoToModule = async () => {
     if (!videoFormData.title.trim() || !videoFormData.youtubeUrl.trim()) {
       toast({
@@ -94,6 +101,29 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
     setAddingVideo(true);
 
     try {
+      // Get the next available order index to avoid duplicates
+      const orderIndex = videoFormData.orderIndex || getNextAvailableOrderIndex();
+
+      // Check if order index already exists for this module
+      const { data: existingVideo } = await supabase
+        .from('module_videos')
+        .select('id')
+        .eq('module_id', moduleId)
+        .eq('order_index', orderIndex)
+        .maybeSingle();
+
+      if (existingVideo) {
+        toast({
+          title: "خطأ",
+          description: `الترتيب ${orderIndex} موجود بالفعل. سيتم استخدام الترتيب التالي المتاح.`,
+          variant: "destructive"
+        });
+        // Use the next available order index
+        const nextOrder = getNextAvailableOrderIndex();
+        setVideoFormData(prev => ({ ...prev, orderIndex: nextOrder }));
+        return;
+      }
+
       // First, create the video
       const { data: videoData, error: videoError } = await supabase
         .from('videos')
@@ -114,7 +144,7 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
         .insert({
           module_id: moduleId,
           video_id: videoData.id,
-          order_index: videoFormData.orderIndex
+          order_index: orderIndex
         });
 
       if (moduleVideoError) throw moduleVideoError;
@@ -143,7 +173,7 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
         description: `تم إضافة الفيديو للوحدة بنجاح${verificationQuestions.length > 0 ? ' مع أسئلة التحقق' : ''}`
       });
 
-      setVideoFormData({ title: '', youtubeUrl: '', orderIndex: 1 });
+      setVideoFormData({ title: '', youtubeUrl: '', orderIndex: getNextAvailableOrderIndex() });
       setVerificationQuestions([]);
       onVideosUpdated();
     } catch (error) {
@@ -279,7 +309,7 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
                 type="number"
                 placeholder="ترتيب"
                 value={videoFormData.orderIndex}
-                onChange={(e) => setVideoFormData({ ...videoFormData, orderIndex: parseInt(e.target.value) || 1 })}
+                onChange={(e) => setVideoFormData({ ...videoFormData, orderIndex: parseInt(e.target.value) || getNextAvailableOrderIndex() })}
                 min="1"
                 disabled={addingVideo}
               />

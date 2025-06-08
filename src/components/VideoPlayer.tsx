@@ -93,6 +93,7 @@ const VideoPlayer = ({
           // Check if user has watched at least 70% of the video
           if (percentage >= 70) {
             setWatchedSufficientTime(true);
+            console.log('Student has watched 70% of the video, showing completion button');
           }
           
           if (newTime % 10 === 0) {
@@ -129,6 +130,7 @@ const VideoPlayer = ({
       if (data && data.completed_at) {
         setIsCompleted(true);
         setCompletionPercentage(data.completion_percentage || 100);
+        console.log('Video already completed:', video.id);
       }
     } catch (error) {
       console.error('Error checking video completion status:', error);
@@ -148,6 +150,7 @@ const VideoPlayer = ({
 
       if (data && data.completion_percentage >= 70) {
         setWatchedSufficientTime(true);
+        console.log('Student has already watched sufficient time for video:', video.id);
       }
     } catch (error) {
       console.error('Error checking watched time:', error);
@@ -220,12 +223,14 @@ const VideoPlayer = ({
     );
   }
 
+  const isVideoFullyComplete = isCompleted && quizCompleted;
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="arabic-heading flex items-center gap-2">
-            {isCompleted && quizCompleted ? (
+            {isVideoFullyComplete ? (
               <CheckCircle className="w-5 h-5 text-green-500" />
             ) : (
               <div className="w-5 h-5 bg-blue-500 rounded-full" />
@@ -255,19 +260,20 @@ const VideoPlayer = ({
 
           <VideoControls
             isPlaying={isPlaying}
-            isCompleted={isCompleted}
+            isCompleted={isVideoFullyComplete}
             isLocked={isLocked}
             onPlayPause={handlePlayPause}
             onRestart={handleRestart}
           />
 
+          {/* Always show the completion button component - it handles its own visibility logic */}
           <VideoCompletionButton
             watchedSufficientTime={watchedSufficientTime}
-            isCompleted={isCompleted && quizCompleted}
+            isCompleted={isVideoFullyComplete}
             onMarkAsComplete={handleMarkAsComplete}
           />
 
-          {isLastVideoInModule && isCompleted && quizCompleted && !isModuleCompleted && (
+          {isLastVideoInModule && isVideoFullyComplete && !isModuleCompleted && (
             <ModuleCompletion onComplete={handleModuleComplete} />
           )}
         </CardContent>
