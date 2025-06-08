@@ -17,7 +17,22 @@ export const useVideoCompletion = (
   const [quizCompleted, setQuizCompleted] = useState(false);
 
   const handleMarkAsComplete = async () => {
-    if (!student || !watchedSufficientTime) {
+    console.log('handleMarkAsComplete called', { 
+      student: !!student, 
+      watchedSufficientTime, 
+      videoId: video.id 
+    });
+
+    if (!student) {
+      toast({
+        title: "خطأ",
+        description: "يجب تسجيل الدخول أولاً",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!watchedSufficientTime) {
       toast({
         title: "تحذير",
         description: "يجب مشاهدة 70% على الأقل من الفيديو قبل تحديده كمكتمل",
@@ -27,8 +42,10 @@ export const useVideoCompletion = (
     }
 
     try {
+      console.log('Marking video as completed:', video.id);
+      
       // Mark video as completed in database
-      await supabase
+      const { error: progressError } = await supabase
         .from('student_video_progress')
         .upsert({
           student_id: student.id,
@@ -38,23 +55,48 @@ export const useVideoCompletion = (
           completed_at: new Date().toISOString()
         });
 
+      if (progressError) {
+        console.error('Error updating video progress:', progressError);
+        throw progressError;
+      }
+
+      console.log('Video marked as completed, checking for verification questions');
+
       // Check if there are verification questions
-      const { data: questions } = await supabase
+      const { data: questions, error: questionsError } = await supabase
         .from('video_verification_questions')
         .select('id')
         .eq('video_id', video.id);
 
+      if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
+        throw questionsError;
+      }
+
+      console.log('Found questions:', questions?.length || 0);
+
       if (questions && questions.length > 0) {
         // Check if quiz is already completed
-        const { data: answers } = await supabase
+        const { data: answers, error: answersError } = await supabase
           .from('student_verification_answers')
           .select('is_correct')
           .eq('student_id', student.id)
           .in('question_id', questions.map(q => q.id));
 
+        if (answersError) {
+          console.error('Error fetching answers:', answersError);
+          throw answersError;
+        }
+
         const allAnsweredCorrectly = answers && 
           answers.length === questions.length && 
           answers.every(answer => answer.is_correct);
+
+        console.log('Quiz status:', { 
+          answersCount: answers?.length || 0, 
+          questionsCount: questions.length, 
+          allCorrect: allAnsweredCorrectly 
+        });
 
         if (allAnsweredCorrectly) {
           setQuizCompleted(true);
@@ -64,14 +106,16 @@ export const useVideoCompletion = (
           });
           onVideoComplete(video.id);
         } else {
+          console.log('Showing quiz for video:', video.id);
           setShowQuiz(true);
           toast({
-            title: "تهانينا!",
+            title: "الفيديو مكتمل!",
             description: "الآن يجب الإجابة على أسئلة التحقق لإلغاء قفل الفيديو التالي",
           });
         }
       } else {
         // No quiz required, mark as completed
+        console.log('No questions found, marking video as fully complete');
         setQuizCompleted(true);
         toast({
           title: "تهانينا! 🎉",
@@ -90,6 +134,7 @@ export const useVideoCompletion = (
   };
 
   const handleQuizComplete = () => {
+    console.log('Quiz completed for video:', video.id);
     setQuizCompleted(true);
     setShowQuiz(false);
     toast({

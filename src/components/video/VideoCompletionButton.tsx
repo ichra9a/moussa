@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, Play } from 'lucide-react';
 
 interface VideoCompletionButtonProps {
   watchedSufficientTime: boolean;
@@ -13,6 +13,11 @@ const VideoCompletionButton = ({
   isCompleted, 
   onMarkAsComplete 
 }: VideoCompletionButtonProps) => {
+  console.log('VideoCompletionButton render:', { 
+    watchedSufficientTime, 
+    isCompleted 
+  });
+
   // Don't show anything if already completed
   if (isCompleted) {
     return (
@@ -30,7 +35,7 @@ const VideoCompletionButton = ({
   // Show completion button if watched sufficient time
   if (watchedSufficientTime) {
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 shadow-sm">
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-6 shadow-lg">
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <CheckCircle className="h-6 w-6 text-green-600" />
@@ -43,7 +48,7 @@ const VideoCompletionButton = ({
           </p>
           <Button
             onClick={onMarkAsComplete}
-            className="w-full bg-green-600 hover:bg-green-700 text-white arabic-text font-semibold py-3 text-lg"
+            className="w-full bg-green-600 hover:bg-green-700 text-white arabic-text font-semibold py-3 text-lg shadow-md hover:shadow-lg transition-all duration-200"
             size="lg"
           >
             <CheckCircle className="h-5 w-5 mr-2" />
@@ -62,6 +67,12 @@ const VideoCompletionButton = ({
         <p className="text-blue-700 arabic-text text-center font-medium">
           📺 شاهد 70% على الأقل من الفيديو لتتمكن من تحديده كمكتمل
         </p>
+      </div>
+      <div className="mt-3 bg-blue-100 rounded-full h-2">
+        <div 
+          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+          style={{ width: '0%' }}
+        />
       </div>
     </div>
   );

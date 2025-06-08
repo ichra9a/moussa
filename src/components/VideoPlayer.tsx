@@ -91,9 +91,13 @@ const VideoPlayer = ({
           setWatchTime(prev => prev + 1);
           
           // Check if user has watched at least 70% of the video
-          if (percentage >= 70) {
+          if (percentage >= 70 && !watchedSufficientTime) {
             setWatchedSufficientTime(true);
-            console.log('Student has watched 70% of the video, showing completion button');
+            console.log('Student has watched 70% of the video, completion button should appear');
+            toast({
+              title: "جاهز للإكمال!",
+              description: "لقد شاهدت 70% من الفيديو. يمكنك الآن تحديده كمكتمل",
+            });
           }
           
           if (newTime % 10 === 0) {
@@ -114,7 +118,7 @@ const VideoPlayer = ({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, duration, isCompleted]);
+  }, [isPlaying, duration, isCompleted, watchedSufficientTime]);
 
   const checkVideoCompletionStatus = async () => {
     if (!student || !video.id) return;
@@ -225,6 +229,15 @@ const VideoPlayer = ({
 
   const isVideoFullyComplete = isCompleted && quizCompleted;
 
+  console.log('Video Player State:', {
+    videoId: video.id,
+    watchedSufficientTime,
+    isCompleted,
+    quizCompleted,
+    completionPercentage,
+    showQuiz
+  });
+
   return (
     <div className="space-y-4">
       <Card>
@@ -266,7 +279,7 @@ const VideoPlayer = ({
             onRestart={handleRestart}
           />
 
-          {/* Always show the completion button component - it handles its own visibility logic */}
+          {/* Video Completion Button - Always render, it handles its own visibility */}
           <VideoCompletionButton
             watchedSufficientTime={watchedSufficientTime}
             isCompleted={isVideoFullyComplete}
@@ -279,6 +292,7 @@ const VideoPlayer = ({
         </CardContent>
       </Card>
 
+      {/* Video Verification Quiz */}
       {showQuiz && (
         <VideoVerificationQuiz
           videoId={video.id}
