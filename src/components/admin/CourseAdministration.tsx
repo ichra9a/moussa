@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Plus, Users, BookOpen, X } from 'lucide-react';
+import { Plus, Users, BookOpen, X, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import StudentManagement from './StudentManagement';
 import NotificationManagement from './NotificationManagement';
 import CourseList from './CourseList';
 import CourseForm from './CourseForm';
+import CourseVideoManager from './CourseVideoManager';
 
 interface Course {
   id: string;
@@ -46,6 +47,7 @@ const CourseAdministration = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateCourse, setShowCreateCourse] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [selectedCourseForVideos, setSelectedCourseForVideos] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('courses');
   const { toast } = useToast();
 
@@ -178,7 +180,7 @@ const CourseAdministration = () => {
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الدورة؟ سيتم حذف جميع المودولات والفيديوهات المرتبطة بها.')) return;
+    if (!confirm('هل أنت متأكد من حذف هذه الدورة؟ سيتم حذف جميع الفيديوهات المرتبطة بها.')) return;
 
     setLoading(true);
     try {
@@ -190,27 +192,13 @@ const CourseAdministration = () => {
 
       if (enrollmentsError) throw enrollmentsError;
 
-      // Get modules to delete their videos
-      const { data: modules } = await supabase
-        .from('modules')
-        .select('id')
+      // Delete videos associated with the course
+      const { error: videosError } = await supabase
+        .from('videos')
+        .delete()
         .eq('course_id', courseId);
 
-      if (modules && modules.length > 0) {
-        const moduleIds = modules.map(m => m.id);
-        
-        // Delete module videos
-        await supabase
-          .from('module_videos')
-          .delete()
-          .in('module_id', moduleIds);
-
-        // Delete modules
-        await supabase
-          .from('modules')
-          .delete()
-          .eq('course_id', courseId);
-      }
+      if (videosError) throw videosError;
 
       // Finally, delete the course
       const { error } = await supabase
@@ -344,8 +332,9 @@ const CourseAdministration = () => {
   return (
     <div className="space-y-8 font-cairo" dir="rtl">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="courses" className="arabic-text">الدورات</TabsTrigger>
+          <TabsTrigger value="videos" className="arabic-text">إدارة الفيديوهات</TabsTrigger>
           <TabsTrigger value="students" className="arabic-text">الطلاب</TabsTrigger>
           <TabsTrigger value="notifications" className="arabic-text">الإشعارات</TabsTrigger>
         </TabsList>
@@ -477,6 +466,46 @@ const CourseAdministration = () => {
                       </Button>
                     </div>
                   ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="videos" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 arabic-heading">
+                <Video className="h-5 w-5" />
+                إدارة فيديوهات الدورات
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label className="arabic-text">اختر الدورة لإدارة فيديوهاتها</Label>
+                  <Select value={selectedCourseForVideos} onValueChange={setSelectedCourseForVideos}>
+                    <SelectTrigger className="arabic-text">
+                      <SelectValue placeholder="اختر دورة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courses.map((course) => (
+                        <SelectItem key={course.id} value={course.id}>
+                          {course.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {selectedCourseForVideos && (
+                  <CourseVideoManager
+                    courseId={selectedCourseForVideos}
+                    courseTitle={courses.find(c => c.id === selectedCourseForVideos)?.title || ''}
+                    onVideosUpdated={() => {
+                      // Refresh any necessary data
+                    }}
+                  />
                 )}
               </div>
             </CardContent>

@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LogOut, Users, BookOpen, Video, Settings, Globe, FileText } from 'lucide-react';
 import StudentManagement from './StudentManagement';
 import CourseAdministration from './CourseAdministration';
-import ModuleManagement from './ModuleManagement';
 import VideoManagement from './VideoManagement';
 import CategoryManagement from './CategoryManagement';
 import WebsiteEditor from './WebsiteEditor';
@@ -91,7 +90,7 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="students" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="students" className="arabic-text flex items-center gap-2">
               <Users size={16} />
               الطلاب
@@ -99,10 +98,6 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
             <TabsTrigger value="courses" className="arabic-text flex items-center gap-2">
               <BookOpen size={16} />
               الدورات
-            </TabsTrigger>
-            <TabsTrigger value="modules" className="arabic-text flex items-center gap-2">
-              <Video size={16} />
-              المودولات
             </TabsTrigger>
             <TabsTrigger value="assignments" className="arabic-text flex items-center gap-2">
               <FileText size={16} />
@@ -128,10 +123,6 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
 
           <TabsContent value="courses">
             <CourseAdministration />
-          </TabsContent>
-
-          <TabsContent value="modules">
-            <ModuleManagement courses={courses} />
           </TabsContent>
 
           <TabsContent value="assignments">
