@@ -1,12 +1,12 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Video, ExternalLink, Trash2, Plus } from 'lucide-react';
+import { Video, ExternalLink, Trash2, Plus, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import VideoVerificationForm from './VideoVerificationForm';
+import VideoQuestionEditor from './VideoQuestionEditor';
 
 interface VerificationQuestion {
   question_text: string;
@@ -38,6 +38,7 @@ interface ModuleVideoManagerProps {
 const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleVideoManagerProps) => {
   const { toast } = useToast();
   const [addingVideo, setAddingVideo] = useState(false);
+  const [editingQuestions, setEditingQuestions] = useState<string | null>(null);
   const [videoFormData, setVideoFormData] = useState({
     title: '',
     youtubeUrl: '',
@@ -191,36 +192,57 @@ const ModuleVideoManager = ({ moduleId, moduleVideos, onVideosUpdated }: ModuleV
         </h4>
         
         {moduleVideos && moduleVideos.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-4">
             {moduleVideos
               .sort((a, b) => a.order_index - b.order_index)
               .map((moduleVideo) => (
-              <div key={moduleVideo.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-bold text-sm">{moduleVideo.order_index}</span>
+              <div key={moduleVideo.id} className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-bold text-sm">{moduleVideo.order_index}</span>
+                    </div>
+                    <div>
+                      <p className="font-medium arabic-text">{moduleVideo.videos.title}</p>
+                      <p className="text-sm text-gray-500">YouTube ID: {moduleVideo.videos.youtube_id}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium arabic-text">{moduleVideo.videos.title}</p>
-                    <p className="text-sm text-gray-500">YouTube ID: {moduleVideo.videos.youtube_id}</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingQuestions(
+                        editingQuestions === moduleVideo.videos.id ? null : moduleVideo.videos.id
+                      )}
+                      className="arabic-text"
+                    >
+                      <Settings className="h-4 w-4" />
+                      {editingQuestions === moduleVideo.videos.id ? 'إخفاء' : 'أسئلة'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(`https://youtube.com/watch?v=${moduleVideo.videos.youtube_id}`, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleRemoveVideoFromModule(moduleVideo.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => window.open(`https://youtube.com/watch?v=${moduleVideo.videos.youtube_id}`, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleRemoveVideoFromModule(moduleVideo.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                
+                {editingQuestions === moduleVideo.videos.id && (
+                  <VideoQuestionEditor
+                    videoId={moduleVideo.videos.id}
+                    videoTitle={moduleVideo.videos.title}
+                    onQuestionsUpdated={onVideosUpdated}
+                  />
+                )}
               </div>
             ))}
           </div>
