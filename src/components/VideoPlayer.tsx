@@ -10,6 +10,7 @@ import VideoProgress from './video/VideoProgress';
 import ModuleCompletion from './video/ModuleCompletion';
 import VideoVerificationQuiz from './video/VideoVerificationQuiz';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
+import { Button } from '@/components/ui/button';
 
 interface Video {
   id: string;
@@ -42,6 +43,7 @@ const VideoPlayer = ({
   const [isModuleCompleted, setIsModuleCompleted] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
+  const [watchedSufficientTime, setWatchedSufficientTime] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -63,6 +65,7 @@ const VideoPlayer = ({
   useEffect(() => {
     if (student && video.id) {
       checkQuizStatus();
+      checkWatchedTime();
     }
   }, [student, video.id]);
 
@@ -75,8 +78,9 @@ const VideoPlayer = ({
           setCompletionPercentage(percentage);
           setWatchTime(prev => prev + 1);
           
-          if (percentage >= 95 && !isCompleted) {
-            handleVideoComplete();
+          // Check if user has watched at least 70% of the video
+          if (percentage >= 70) {
+            setWatchedSufficientTime(true);
           }
           
           if (newTime % 10 === 0) {
@@ -99,6 +103,25 @@ const VideoPlayer = ({
     };
   }, [isPlaying, duration, isCompleted]);
 
+  const checkWatchedTime = async () => {
+    if (!student || !video.id) return;
+
+    try {
+      const { data } = await supabase
+        .from('student_video_progress')
+        .select('completion_percentage')
+        .eq('student_id', student.id)
+        .eq('video_id', video.id)
+        .maybeSingle();
+
+      if (data && data.completion_percentage >= 70) {
+        setWatchedSufficientTime(true);
+      }
+    } catch (error) {
+      console.error('Error checking watched time:', error);
+    }
+  };
+
   const checkModuleCompletion = async () => {
     if (!moduleId || !student) return;
 
@@ -120,14 +143,12 @@ const VideoPlayer = ({
     if (!student || !video.id) return;
 
     try {
-      // Check if there are verification questions for this video
       const { data: questions } = await supabase
         .from('video_verification_questions')
         .select('id')
         .eq('video_id', video.id);
 
       if (questions && questions.length > 0) {
-        // Check if student has answered all questions correctly
         const { data: answers } = await supabase
           .from('student_verification_answers')
           .select('is_correct')
@@ -140,7 +161,6 @@ const VideoPlayer = ({
 
         setQuizCompleted(allAnsweredCorrectly || false);
       } else {
-        // No questions for this video
         setQuizCompleted(true);
       }
     } catch (error) {
@@ -148,27 +168,29 @@ const VideoPlayer = ({
     }
   };
 
-  const handleVideoComplete = async () => {
-    if (isCompleted || !student) return;
+  const handleMarkAsComplete = async () => {
+    if (!student || !watchedSufficientTime) {
+      toast({
+        title: "تحذير",
+        description: "يجب مشاهدة 70% على الأقل من الفيديو قبل تحديده كمكتمل",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setIsCompleted(true);
-    setCompletionPercentage(100);
-    
     try {
       await supabase
         .from('student_video_progress')
         .upsert({
           student_id: student.id,
           video_id: video.id,
-          watch_time: duration,
-          completion_percentage: 100,
+          watch_time: Math.max(watchTime, Math.floor(duration * 0.7)),
+          completion_percentage: Math.max(completionPercentage, 70),
           completed_at: new Date().toISOString()
         });
 
-      toast({
-        title: "تهانينا! 🎉",
-        description: "لقد أكملت مشاهدة هذا الفيديو بنجاح",
-      });
+      setIsCompleted(true);
+      setCompletionPercentage(100);
 
       // Check if there are verification questions
       const { data: questions } = await supabase
@@ -178,11 +200,24 @@ const VideoPlayer = ({
 
       if (questions && questions.length > 0 && !quizCompleted) {
         setShowQuiz(true);
+        toast({
+          title: "تهانينا!",
+          description: "الآن يجب الإجابة على أسئلة التحقق لإلغاء قفل الفيديو التالي",
+        });
       } else {
+        toast({
+          title: "تهانينا! 🎉",
+          description: "لقد أكملت مشاهدة هذا الفيديو بنجاح",
+        });
         onVideoComplete(video.id);
       }
     } catch (error) {
       console.error('Error marking video complete:', error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تحديث حالة الفيديو",
+        variant: "destructive"
+      });
     }
   };
 
@@ -253,7 +288,7 @@ const VideoPlayer = ({
         </CardHeader>
         <CardContent>
           <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center">
-            <p className="text-gray-500 arabic-text">يجب إكمال الوحدة السابقة أولاً</p>
+            <p className="text-gray-500 arabic-text">يجب إكمال الفيديو السابق أولاً</p>
           </div>
         </CardContent>
       </Card>
@@ -300,6 +335,35 @@ const VideoPlayer = ({
             onPlayPause={handlePlayPause}
             onRestart={handleRestart}
           />
+
+          {/* Mark as Complete Button */}
+          {!isCompleted && watchedSufficientTime && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-green-800 arabic-text">جاهز لتحديد الفيديو كمكتمل؟</h4>
+                  <p className="text-sm text-green-600 arabic-text mt-1">
+                    لقد شاهدت ما يكفي من الفيديو. اضغط لتحديده كمكتمل والانتقال للخطوة التالية.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleMarkAsComplete}
+                  className="bg-green-600 hover:bg-green-700 text-white arabic-text"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  تحديد كمكتمل
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!watchedSufficientTime && !isCompleted && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-blue-700 arabic-text text-sm">
+                شاهد 70% على الأقل من الفيديو لتتمكن من تحديده كمكتمل
+              </p>
+            </div>
+          )}
 
           {isLastVideoInModule && isCompleted && quizCompleted && !isModuleCompleted && (
             <ModuleCompletion onComplete={handleModuleComplete} />

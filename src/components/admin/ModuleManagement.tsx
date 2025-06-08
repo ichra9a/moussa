@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -197,7 +196,6 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
           description: "تم تحديث الوحدة بنجاح"
         });
       } else {
-        // Get the next available order index for the selected course
         const nextOrderIndex = await getNextOrderIndex(formData.course_id);
         
         const { error } = await supabase
@@ -234,6 +232,16 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
     }
   };
 
+  const validateVerificationQuestions = (questions: VerificationQuestion[]) => {
+    return questions.every(q => 
+      q.question_text.trim() !== '' &&
+      q.option_a.trim() !== '' &&
+      q.option_b.trim() !== '' &&
+      q.option_c.trim() !== '' &&
+      q.option_d.trim() !== ''
+    );
+  };
+
   const handleAddVideoToModule = async (moduleId: string) => {
     if (!videoFormData.title.trim() || !videoFormData.youtubeUrl.trim()) {
       toast({
@@ -249,6 +257,15 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
       toast({
         title: "خطأ",
         description: "رابط يوتيوب غير صحيح",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (verificationQuestions.length > 0 && !validateVerificationQuestions(verificationQuestions)) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع حقول الأسئلة المطلوبة",
         variant: "destructive"
       });
       return;
@@ -510,7 +527,6 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Videos in this module */}
                 <div>
                   <h4 className="font-medium arabic-text mb-3 flex items-center gap-2">
                     <Video className="h-4 w-4" />
@@ -556,13 +572,12 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                   )}
                 </div>
 
-                {/* Add video from YouTube URL */}
                 <div className="border-t pt-4">
                   <h5 className="font-medium arabic-text mb-3">إضافة فيديو من يوتيوب</h5>
                   <div className="space-y-3">
                     <div>
                       <Input
-                        placeholder="عنوان الفيديو"
+                        placeholder="عنوان الفيديو *"
                         value={videoFormData.title}
                         onChange={(e) => setVideoFormData({ ...videoFormData, title: e.target.value })}
                         className="arabic-text"
@@ -571,7 +586,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                     </div>
                     <div>
                       <Input
-                        placeholder="رابط يوتيوب (https://youtube.com/watch?v=...)"
+                        placeholder="رابط يوتيوب (https://youtube.com/watch?v=...) *"
                         value={videoFormData.youtubeUrl}
                         onChange={(e) => setVideoFormData({ ...videoFormData, youtubeUrl: e.target.value })}
                         dir="ltr"
@@ -604,7 +619,6 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                       </Button>
                     </div>
 
-                    {/* Verification Questions Section */}
                     <div className="mt-6 border-t pt-4">
                       <VideoVerificationForm
                         questions={verificationQuestions}
