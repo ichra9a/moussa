@@ -697,6 +697,48 @@ export type Database = {
           },
         ]
       }
+      student_verification_answers: {
+        Row: {
+          answered_at: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+          student_id: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+          student_id: string
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_answer?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_verification_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "video_verification_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_verification_answers_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_video_progress: {
         Row: {
           completed_at: string | null
@@ -797,6 +839,53 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      video_verification_questions: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_text: string
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          id?: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          question_text: string
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          question_text?: string
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_verification_questions_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       videos: {
         Row: {

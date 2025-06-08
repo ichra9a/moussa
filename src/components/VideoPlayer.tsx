@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import VideoControls from './video/VideoControls';
 import VideoProgress from './video/VideoProgress';
 import ModuleCompletion from './video/ModuleCompletion';
+import VideoVerificationQuiz from './video/VideoVerificationQuiz';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 
 interface Video {
@@ -39,6 +40,8 @@ const VideoPlayer = ({
   const [duration, setDuration] = useState(video.duration_seconds || 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isModuleCompleted, setIsModuleCompleted] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizCompleted, setQuizCompleted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -56,6 +59,12 @@ const VideoPlayer = ({
       checkModuleCompletion();
     }
   }, [moduleId, student]);
+
+  useEffect(() => {
+    if (student && video.id) {
+      checkQuizStatus();
+    }
+  }, [student, video.id]);
 
   useEffect(() => {
     if (isPlaying && !isCompleted) {
@@ -107,6 +116,38 @@ const VideoPlayer = ({
     }
   };
 
+  const checkQuizStatus = async () => {
+    if (!student || !video.id) return;
+
+    try {
+      // Check if there are verification questions for this video
+      const { data: questions } = await supabase
+        .from('video_verification_questions')
+        .select('id')
+        .eq('video_id', video.id);
+
+      if (questions && questions.length > 0) {
+        // Check if student has answered all questions correctly
+        const { data: answers } = await supabase
+          .from('student_verification_answers')
+          .select('is_correct')
+          .eq('student_id', student.id)
+          .in('question_id', questions.map(q => q.id));
+
+        const allAnsweredCorrectly = answers && 
+          answers.length === questions.length && 
+          answers.every(answer => answer.is_correct);
+
+        setQuizCompleted(allAnsweredCorrectly || false);
+      } else {
+        // No questions for this video
+        setQuizCompleted(true);
+      }
+    } catch (error) {
+      console.error('Error checking quiz status:', error);
+    }
+  };
+
   const handleVideoComplete = async () => {
     if (isCompleted || !student) return;
 
@@ -129,10 +170,26 @@ const VideoPlayer = ({
         description: "لقد أكملت مشاهدة هذا الفيديو بنجاح",
       });
 
-      onVideoComplete(video.id);
+      // Check if there are verification questions
+      const { data: questions } = await supabase
+        .from('video_verification_questions')
+        .select('id')
+        .eq('video_id', video.id);
+
+      if (questions && questions.length > 0 && !quizCompleted) {
+        setShowQuiz(true);
+      } else {
+        onVideoComplete(video.id);
+      }
     } catch (error) {
       console.error('Error marking video complete:', error);
     }
+  };
+
+  const handleQuizComplete = () => {
+    setQuizCompleted(true);
+    setShowQuiz(false);
+    onVideoComplete(video.id);
   };
 
   const handleModuleComplete = async () => {
@@ -155,7 +212,6 @@ const VideoPlayer = ({
         description: "لقد أكملت هذه الوحدة بنجاح! يمكنك الآن الوصول للوحدة التالية",
       });
 
-      // Refresh the page to update module access
       window.location.reload();
     } catch (error) {
       console.error('Error marking module complete:', error);
@@ -205,50 +261,59 @@ const VideoPlayer = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="arabic-heading flex items-center gap-2">
-          {isCompleted ? (
-            <CheckCircle className="w-5 h-5 text-green-500" />
-          ) : (
-            <div className="w-5 h-5 bg-blue-500 rounded-full" />
-          )}
-          {video.title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="aspect-video relative">
-          <iframe
-            ref={playerRef}
-            src={`https://www.youtube-nocookie.com/embed/${video.youtube_id}?enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&disablekb=1&iv_load_policy=3&cc_load_policy=0&fs=1&autohide=1`}
-            className="w-full h-full rounded-lg"
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title={video.title}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="arabic-heading flex items-center gap-2">
+            {isCompleted && quizCompleted ? (
+              <CheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <div className="w-5 h-5 bg-blue-500 rounded-full" />
+            )}
+            {video.title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="aspect-video relative">
+            <iframe
+              ref={playerRef}
+              src={`https://www.youtube-nocookie.com/embed/${video.youtube_id}?enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&disablekb=1&iv_load_policy=3&cc_load_policy=0&fs=1&autohide=1`}
+              className="w-full h-full rounded-lg"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title={video.title}
+            />
+          </div>
+
+          <VideoProgress
+            completionPercentage={completionPercentage}
+            currentTime={currentTime}
+            duration={duration}
+            watchTime={watchTime}
           />
-        </div>
 
-        <VideoProgress
-          completionPercentage={completionPercentage}
-          currentTime={currentTime}
-          duration={duration}
-          watchTime={watchTime}
+          <VideoControls
+            isPlaying={isPlaying}
+            isCompleted={isCompleted}
+            isLocked={isLocked}
+            onPlayPause={handlePlayPause}
+            onRestart={handleRestart}
+          />
+
+          {isLastVideoInModule && isCompleted && quizCompleted && !isModuleCompleted && (
+            <ModuleCompletion onComplete={handleModuleComplete} />
+          )}
+        </CardContent>
+      </Card>
+
+      {showQuiz && (
+        <VideoVerificationQuiz
+          videoId={video.id}
+          onQuizComplete={handleQuizComplete}
         />
-
-        <VideoControls
-          isPlaying={isPlaying}
-          isCompleted={isCompleted}
-          isLocked={isLocked}
-          onPlayPause={handlePlayPause}
-          onRestart={handleRestart}
-        />
-
-        {isLastVideoInModule && isCompleted && !isModuleCompleted && (
-          <ModuleCompletion onComplete={handleModuleComplete} />
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 

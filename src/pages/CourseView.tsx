@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +35,11 @@ interface ModuleCompletion {
   completed_at: string | null;
 }
 
+interface QuizCompletion {
+  video_id: string;
+  completed: boolean;
+}
+
 const CourseView = () => {
   const { courseId } = useParams();
   const { student } = useAuth();
@@ -44,6 +48,7 @@ const CourseView = () => {
   const [modules, setModules] = useState<Module[]>([]);
   const [videoProgress, setVideoProgress] = useState<VideoProgress[]>([]);
   const [moduleCompletions, setModuleCompletions] = useState<ModuleCompletion[]>([]);
+  const [quizCompletions, setQuizCompletions] = useState<QuizCompletion[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -125,6 +130,7 @@ const CourseView = () => {
 
       await fetchVideoProgress();
       await fetchModuleCompletions();
+      await fetchQuizCompletions();
       
     } catch (error) {
       console.error('Error fetching course data:', error);
@@ -167,9 +173,81 @@ const CourseView = () => {
     }
   };
 
+  const fetchQuizCompletions = async () => {
+    if (!student) return;
+
+    try {
+      // Get all videos from modules
+      const allVideos = modules.flatMap(module => module.videos);
+      
+      if (allVideos.length === 0) return;
+
+      // Get all verification questions for these videos
+      const { data: questions } = await supabase
+        .from('video_verification_questions')
+        .select('id, video_id')
+        .in('video_id', allVideos.map(v => v.id));
+
+      if (!questions || questions.length === 0) {
+        // No questions exist, mark all videos as quiz completed
+        const completions = allVideos.map(video => ({
+          video_id: video.id,
+          completed: true
+        }));
+        setQuizCompletions(completions);
+        return;
+      }
+
+      // Group questions by video
+      const questionsByVideo = questions.reduce((acc, q) => {
+        if (!acc[q.video_id]) acc[q.video_id] = [];
+        acc[q.video_id].push(q.id);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // Get student answers
+      const { data: answers } = await supabase
+        .from('student_verification_answers')
+        .select('question_id, is_correct')
+        .eq('student_id', student.id)
+        .in('question_id', questions.map(q => q.id));
+
+      // Calculate completion status for each video
+      const completions = allVideos.map(video => {
+        const videoQuestions = questionsByVideo[video.id] || [];
+        
+        if (videoQuestions.length === 0) {
+          return { video_id: video.id, completed: true };
+        }
+
+        const videoAnswers = answers?.filter(a => 
+          videoQuestions.includes(a.question_id)
+        ) || [];
+
+        const completed = videoAnswers.length === videoQuestions.length && 
+          videoAnswers.every(a => a.is_correct);
+
+        return { video_id: video.id, completed };
+      });
+
+      setQuizCompletions(completions);
+    } catch (error) {
+      console.error('Error fetching quiz completions:', error);
+    }
+  };
+
   const isVideoCompleted = (videoId: string) => {
     const progress = videoProgress.find(p => p.video_id === videoId);
     return progress?.completed_at !== null && progress?.completion_percentage >= 95;
+  };
+
+  const isQuizCompleted = (videoId: string) => {
+    const quizStatus = quizCompletions.find(q => q.video_id === videoId);
+    return quizStatus?.completed || false;
+  };
+
+  const isVideoFullyCompleted = (videoId: string) => {
+    return isVideoCompleted(videoId) && isQuizCompleted(videoId);
   };
 
   const isModuleCompleted = (module: Module) => {
@@ -190,11 +268,12 @@ const CourseView = () => {
     
     const module = modules[moduleIndex];
     const previousVideo = module.videos[videoIndex - 1];
-    return previousVideo ? isVideoCompleted(previousVideo.id) : false;
+    return previousVideo ? isVideoFullyCompleted(previousVideo.id) : false;
   };
 
   const handleVideoComplete = async (videoId: string) => {
     await fetchVideoProgress();
+    await fetchQuizCompletions();
     
     const moduleIndex = modules.findIndex(module => 
       module.videos.some(video => video.id === videoId)
@@ -230,14 +309,14 @@ const CourseView = () => {
   const getOverallProgress = () => {
     const totalVideos = modules.reduce((sum, module) => sum + module.videos.length, 0);
     const completedVideos = modules.reduce((sum, module) => 
-      sum + module.videos.filter(video => isVideoCompleted(video.id)).length, 0
+      sum + module.videos.filter(video => isVideoFullyCompleted(video.id)).length, 0
     );
     
     return totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
   };
 
   const getModuleProgress = (module: Module) => {
-    const completedVideos = module.videos.filter(video => isVideoCompleted(video.id)).length;
+    const completedVideos = module.videos.filter(video => isVideoFullyCompleted(video.id)).length;
     return module.videos.length > 0 ? Math.round((completedVideos / module.videos.length) * 100) : 0;
   };
 
@@ -245,7 +324,7 @@ const CourseView = () => {
   const completedModulesCount = modules.filter(module => isModuleCompleted(module)).length;
   const totalVideos = modules.reduce((sum, module) => sum + module.videos.length, 0);
   const completedVideos = modules.reduce((sum, module) => 
-    sum + module.videos.filter(video => isVideoCompleted(video.id)).length, 0
+    sum + module.videos.filter(video => isVideoFullyCompleted(video.id)).length, 0
   );
 
   if (loading) {
@@ -302,7 +381,7 @@ const CourseView = () => {
             isModuleCompleted={isModuleCompleted}
             isModuleUnlocked={isModuleUnlocked}
             isVideoUnlocked={isVideoUnlocked}
-            isVideoCompleted={isVideoCompleted}
+            isVideoCompleted={isVideoFullyCompleted}
             onVideoComplete={handleVideoComplete}
           />
         </div>
@@ -310,5 +389,19 @@ const CourseView = () => {
     </div>
   );
 };
+
+function getOverallProgress() {
+  const totalVideos = modules.reduce((sum, module) => sum + module.videos.length, 0);
+  const completedVideos = modules.reduce((sum, module) => 
+    sum + module.videos.filter(video => isVideoFullyCompleted(video.id)).length, 0
+  );
+  
+  return totalVideos > 0 ? Math.round((completedVideos / totalVideos) * 100) : 0;
+}
+
+function getModuleProgress(module: Module) {
+  const completedVideos = module.videos.filter(video => isVideoFullyCompleted(video.id)).length;
+  return module.videos.length > 0 ? Math.round((completedVideos / module.videos.length) * 100) : 0;
+}
 
 export default CourseView;

@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import VideoVerificationForm from './VideoVerificationForm';
 
 interface Video {
   id: string;
@@ -76,6 +77,7 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [addingVideo, setAddingVideo] = useState(false);
+  const [verificationQuestions, setVerificationQuestions] = useState<VerificationQuestion[]>([]);
 
   useEffect(() => {
     fetchModules();
@@ -270,12 +272,32 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
 
       if (moduleVideoError) throw moduleVideoError;
 
+      // Add verification questions if any
+      if (verificationQuestions.length > 0) {
+        const questionsToInsert = verificationQuestions.map(q => ({
+          video_id: videoData.id,
+          question_text: q.question_text,
+          correct_answer: q.correct_answer,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d
+        }));
+
+        const { error: questionsError } = await supabase
+          .from('video_verification_questions')
+          .insert(questionsToInsert);
+
+        if (questionsError) throw questionsError;
+      }
+
       toast({
         title: "تم الإضافة",
-        description: "تم إضافة الفيديو للوحدة بنجاح"
+        description: `تم إضافة الفيديو للوحدة بنجاح${verificationQuestions.length > 0 ? ' مع أسئلة التحقق' : ''}`
       });
 
       setVideoFormData({ title: '', youtubeUrl: '', orderIndex: 1 });
+      setVerificationQuestions([]);
       fetchModules();
     } catch (error) {
       console.error('Error adding video to module:', error);
@@ -570,6 +592,14 @@ const ModuleManagement = ({ courses: propCourses }: ModuleManagementProps) => {
                           </>
                         )}
                       </Button>
+                    </div>
+
+                    {/* Verification Questions Section */}
+                    <div className="mt-6 border-t pt-4">
+                      <VideoVerificationForm
+                        questions={verificationQuestions}
+                        onQuestionsChange={setVerificationQuestions}
+                      />
                     </div>
                   </div>
                 </div>
