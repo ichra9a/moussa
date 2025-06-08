@@ -27,6 +27,7 @@ export const useVideoCompletion = (
     }
 
     try {
+      // Mark video as completed in database
       await supabase
         .from('student_video_progress')
         .upsert({
@@ -43,13 +44,35 @@ export const useVideoCompletion = (
         .select('id')
         .eq('video_id', video.id);
 
-      if (questions && questions.length > 0 && !quizCompleted) {
-        setShowQuiz(true);
-        toast({
-          title: "تهانينا!",
-          description: "الآن يجب الإجابة على أسئلة التحقق لإلغاء قفل الفيديو التالي",
-        });
+      if (questions && questions.length > 0) {
+        // Check if quiz is already completed
+        const { data: answers } = await supabase
+          .from('student_verification_answers')
+          .select('is_correct')
+          .eq('student_id', student.id)
+          .in('question_id', questions.map(q => q.id));
+
+        const allAnsweredCorrectly = answers && 
+          answers.length === questions.length && 
+          answers.every(answer => answer.is_correct);
+
+        if (allAnsweredCorrectly) {
+          setQuizCompleted(true);
+          toast({
+            title: "تهانينا! 🎉",
+            description: "لقد أكملت مشاهدة هذا الفيديو بنجاح",
+          });
+          onVideoComplete(video.id);
+        } else {
+          setShowQuiz(true);
+          toast({
+            title: "تهانينا!",
+            description: "الآن يجب الإجابة على أسئلة التحقق لإلغاء قفل الفيديو التالي",
+          });
+        }
       } else {
+        // No quiz required, mark as completed
+        setQuizCompleted(true);
         toast({
           title: "تهانينا! 🎉",
           description: "لقد أكملت مشاهدة هذا الفيديو بنجاح",
@@ -69,6 +92,10 @@ export const useVideoCompletion = (
   const handleQuizComplete = () => {
     setQuizCompleted(true);
     setShowQuiz(false);
+    toast({
+      title: "تهانينا! 🎉",
+      description: "لقد أكملت الفيديو والاختبار بنجاح. يمكنك الآن مشاهدة الفيديو التالي",
+    });
     onVideoComplete(video.id);
   };
 

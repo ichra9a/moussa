@@ -75,6 +75,7 @@ const VideoPlayer = ({
 
   useEffect(() => {
     if (student && video.id) {
+      checkVideoCompletionStatus();
       checkQuizStatus();
       checkWatchedTime();
     }
@@ -113,6 +114,26 @@ const VideoPlayer = ({
       }
     };
   }, [isPlaying, duration, isCompleted]);
+
+  const checkVideoCompletionStatus = async () => {
+    if (!student || !video.id) return;
+
+    try {
+      const { data } = await supabase
+        .from('student_video_progress')
+        .select('completed_at, completion_percentage')
+        .eq('student_id', student.id)
+        .eq('video_id', video.id)
+        .maybeSingle();
+
+      if (data && data.completed_at) {
+        setIsCompleted(true);
+        setCompletionPercentage(data.completion_percentage || 100);
+      }
+    } catch (error) {
+      console.error('Error checking video completion status:', error);
+    }
+  };
 
   const checkWatchedTime = async () => {
     if (!student || !video.id) return;
@@ -242,7 +263,7 @@ const VideoPlayer = ({
 
           <VideoCompletionButton
             watchedSufficientTime={watchedSufficientTime}
-            isCompleted={isCompleted}
+            isCompleted={isCompleted && quizCompleted}
             onMarkAsComplete={handleMarkAsComplete}
           />
 

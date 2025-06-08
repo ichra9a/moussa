@@ -37,7 +37,7 @@ export const useCourseProgress = (
 ) => {
   const isVideoCompleted = (videoId: string) => {
     const progress = videoProgress.find(p => p.video_id === videoId);
-    return progress?.completed_at !== null && progress?.completion_percentage >= 95;
+    return progress?.completed_at !== null && progress?.completion_percentage >= 70;
   };
 
   const isQuizCompleted = (videoId: string) => {

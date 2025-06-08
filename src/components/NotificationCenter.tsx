@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bell, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bell, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Notification {
   id: string;
@@ -33,6 +34,40 @@ const NotificationCenter = () => {
     if (student) {
       fetchNotifications();
       fetchGlobalNotifications();
+      
+      // Set up real-time subscription for new notifications
+      const channel = supabase
+        .channel('notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `student_id=eq.${student.id}`
+          },
+          (payload) => {
+            console.log('New notification received:', payload);
+            fetchNotifications();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'global_notifications'
+          },
+          (payload) => {
+            console.log('New global notification received:', payload);
+            fetchGlobalNotifications();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [student]);
 
@@ -51,7 +86,10 @@ const NotificationCenter = () => {
         return;
       }
 
-      if (data) setNotifications(data);
+      if (data) {
+        console.log('Fetched notifications:', data);
+        setNotifications(data);
+      }
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -70,7 +108,10 @@ const NotificationCenter = () => {
         return;
       }
 
-      if (data) setGlobalNotifications(data);
+      if (data) {
+        console.log('Fetched global notifications:', data);
+        setGlobalNotifications(data);
+      }
     } catch (error) {
       console.error('Error fetching global notifications:', error);
     } finally {
@@ -97,6 +138,24 @@ const NotificationCenter = () => {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    if (!student) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+        .eq('student_id', student.id);
+
+      if (!error) {
+        setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
     }
   };
 
@@ -174,10 +233,9 @@ const NotificationCenter = () => {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                className={`border rounded-lg p-3 transition-colors ${
                   notification.is_read ? 'bg-gray-50' : 'bg-white border-blue-200'
                 }`}
-                onClick={() => !notification.is_read && markAsRead(notification.id)}
               >
                 <div className="flex items-start gap-2">
                   {getTypeIcon(notification.type)}
@@ -188,9 +246,26 @@ const NotificationCenter = () => {
                       <span className="text-xs text-gray-400">
                         {new Date(notification.created_at).toLocaleDateString('ar')}
                       </span>
-                      {!notification.is_read && (
-                        <Badge variant="secondary" className="text-xs">جديد</Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {!notification.is_read && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markAsRead(notification.id)}
+                            className="text-xs"
+                          >
+                            تحديد كمقروء
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => deleteNotification(notification.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
