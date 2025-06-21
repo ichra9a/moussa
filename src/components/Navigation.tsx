@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, HelpCircle } from 'lucide-react';
+import { Menu, X, HelpCircle, Users, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Navigation = () => {
@@ -25,6 +25,14 @@ const Navigation = () => {
           <div className="hidden md:flex items-center space-x-4 space-x-reverse">
             <Link to="/" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text">
               الرئيسية
+            </Link>
+            <Link to="#about" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text flex items-center gap-2">
+              <Users size={16} />
+              من نحن
+            </Link>
+            <Link to="#contact" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text flex items-center gap-2">
+              <Mail size={16} />
+              تواصل معنا
             </Link>
             <Link to="/faq" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text flex items-center gap-2">
               <HelpCircle size={16} />
@@ -56,6 +64,22 @@ const Navigation = () => {
                 onClick={() => setIsOpen(false)}
               >
                 الرئيسية
+              </Link>
+              <Link
+                to="#about"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium arabic-text flex items-center gap-2"
+                onClick={() => setIsOpen(false)}
+              >
+                <Users size={16} />
+                من نحن
+              </Link>
+              <Link
+                to="#contact"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium arabic-text flex items-center gap-2"
+                onClick={() => setIsOpen(false)}
+              >
+                <Mail size={16} />
+                تواصل معنا
               </Link>
               <Link
                 to="/faq"
