@@ -919,6 +919,53 @@ export type Database = {
         }
         Relationships: []
       }
+      user_question_submissions: {
+        Row: {
+          admin_response: string | null
+          category_id: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          question_text: string
+          status: string
+          submission_date: string
+          updated_at: string
+        }
+        Insert: {
+          admin_response?: string | null
+          category_id: string
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          question_text: string
+          status?: string
+          submission_date?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_response?: string | null
+          category_id?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          question_text?: string
+          status?: string
+          submission_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_question_submissions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "faq_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_verification_questions: {
         Row: {
           correct_answer: string

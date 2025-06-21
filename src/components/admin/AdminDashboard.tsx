@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Users, BookOpen, Video, Settings, Globe, FileText, HelpCircle } from 'lucide-react';
+import { LogOut, Users, BookOpen, Video, Settings, Globe, FileText, HelpCircle, MessageSquare } from 'lucide-react';
 import StudentManagement from './StudentManagement';
 import CourseAdministration from './CourseAdministration';
 import VideoManagement from './VideoManagement';
@@ -11,6 +11,7 @@ import CategoryManagement from './CategoryManagement';
 import WebsiteEditor from './WebsiteEditor';
 import AssignmentManagement from './AssignmentManagement';
 import FAQManagement from './FAQManagement';
+import UserQuestionManagement from './UserQuestionManagement';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -91,7 +92,7 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="students" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="students" className="arabic-text flex items-center gap-2">
               <Users size={16} />
               الطلاب
@@ -115,6 +116,10 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
             <TabsTrigger value="faq" className="arabic-text flex items-center gap-2">
               <HelpCircle size={16} />
               الأسئلة الشائعة
+            </TabsTrigger>
+            <TabsTrigger value="user-questions" className="arabic-text flex items-center gap-2">
+              <MessageSquare size={16} />
+              أسئلة المستخدمين
             </TabsTrigger>
             <TabsTrigger value="website" className="arabic-text flex items-center gap-2">
               <Globe size={16} />
@@ -152,6 +157,10 @@ const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
 
           <TabsContent value="faq">
             <FAQManagement />
+          </TabsContent>
+
+          <TabsContent value="user-questions">
+            <UserQuestionManagement />
           </TabsContent>
 
           <TabsContent value="website">

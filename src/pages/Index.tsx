@@ -8,6 +8,7 @@ import SearchSection from '../components/SearchSection';
 import AboutSection from '../components/AboutSection';
 import ContactSection from '../components/ContactSection';
 import CourseSubscriptionSection from '../components/CourseSubscriptionSection';
+import HomeFAQSection from '../components/HomeFAQSection';
 import Footer from '../components/Footer';
 
 const Index = () => {
@@ -39,6 +40,7 @@ const Index = () => {
       <SearchSection searchQuery={searchQuery} onSearchChange={setSearchQuery} />
       <CourseSubscriptionSection />
       <FeaturedCategories onVideoSelect={setSelectedVideo} searchQuery={searchQuery} />
+      <HomeFAQSection />
       <AboutSection />
       <ContactSection />
       <Footer />
