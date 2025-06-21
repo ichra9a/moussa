@@ -1,145 +1,77 @@
 
 import { useState } from 'react';
-import { Menu, X, Settings, User, LogIn } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { Link } from 'react-router-dom';
+import { Menu, X, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Navigation = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { student, signOut } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
 
-  const navLinks = [
-    { name: 'الرئيسية', href: '#home' },
-    { name: 'الفئات', href: '#categories' },
-    { name: 'من نحن', href: '#about' },
-    { name: 'تواصل معنا', href: '#contact' }
-  ];
+  const toggleMenu = () => {
+    setIsOpen(!isOpen);
+  };
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50 font-cairo mobile-nav">
+    <nav className="bg-white shadow-lg font-cairo" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <h1 className="text-2xl font-bold text-slate-800 arabic-heading high-contrast">منصة التدريب</h1>
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link to="/" className="flex-shrink-0">
+              <h1 className="text-2xl font-bold text-blue-600 arabic-heading">منصة التعلم</h1>
+            </Link>
           </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:block">
-            <div className="mr-10 flex items-baseline space-x-reverse space-x-8">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-slate-600 hover:text-slate-900 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced"
-                >
-                  {link.name}
-                </a>
-              ))}
-              
-              {student ? (
-                <>
-                  <a
-                    href="/dashboard"
-                    className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
-                  >
-                    <User size={16} />
-                    لوحة الطالب
-                  </a>
-                  <Button
-                    onClick={signOut}
-                    variant="ghost"
-                    className="text-slate-600 hover:text-red-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text"
-                  >
-                    تسجيل الخروج
-                  </Button>
-                </>
-              ) : (
-                <a
-                  href="/auth"
-                  className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
-                >
-                  <LogIn size={16} />
-                  تسجيل الدخول
-                </a>
-              )}
-              
-              <a
-                href="/admin"
-                className="text-slate-600 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-smooth arabic-text focus-enhanced flex items-center gap-1"
-              >
-                <Settings size={16} />
-                الإدارة
-              </a>
-            </div>
+          {/* Desktop Menu */}
+          <div className="hidden md:flex items-center space-x-4 space-x-reverse">
+            <Link to="/" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text">
+              الرئيسية
+            </Link>
+            <Link to="/faq" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium arabic-text flex items-center gap-2">
+              <HelpCircle size={16} />
+              الأسئلة الشائعة
+            </Link>
+            <Link to="/auth">
+              <Button className="arabic-text">تسجيل الدخول</Button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center">
             <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-slate-600 hover:text-slate-900 p-2 mobile-touch transition-smooth"
+              onClick={toggleMenu}
+              className="text-gray-700 hover:text-blue-600 focus:outline-none focus:text-blue-600"
             >
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
+        {/* Mobile Menu */}
+        {isOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-slate-600 hover:text-slate-900 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {link.name}
-                </a>
-              ))}
-              
-              {student ? (
-                <>
-                  <a
-                    href="/dashboard"
-                    className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <User size={16} />
-                    لوحة الطالب
-                  </a>
-                  <Button
-                    onClick={() => {
-                      signOut();
-                      setIsMenuOpen(false);
-                    }}
-                    variant="ghost"
-                    className="text-slate-600 hover:text-red-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth w-full text-right"
-                  >
-                    تسجيل الخروج
-                  </Button>
-                </>
-              ) : (
-                <a
-                  href="/auth"
-                  className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <LogIn size={16} />
-                  تسجيل الدخول
-                </a>
-              )}
-              
-              <a
-                href="/admin"
-                className="text-slate-600 hover:text-blue-600 block px-3 py-2 text-base font-medium arabic-text mobile-touch transition-smooth flex items-center gap-2"
-                onClick={() => setIsMenuOpen(false)}
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
+              <Link
+                to="/"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium arabic-text"
+                onClick={() => setIsOpen(false)}
               >
-                <Settings size={16} />
-                لوحة الإدارة
-              </a>
+                الرئيسية
+              </Link>
+              <Link
+                to="/faq"
+                className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium arabic-text flex items-center gap-2"
+                onClick={() => setIsOpen(false)}
+              >
+                <HelpCircle size={16} />
+                الأسئلة الشائعة
+              </Link>
+              <Link
+                to="/auth"
+                className="block px-3 py-2"
+                onClick={() => setIsOpen(false)}
+              >
+                <Button className="w-full arabic-text">تسجيل الدخول</Button>
+              </Link>
             </div>
           </div>
         )}
