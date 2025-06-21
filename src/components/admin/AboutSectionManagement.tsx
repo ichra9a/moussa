@@ -79,8 +79,12 @@ const AboutSectionManagement = () => {
         .eq('setting_key', 'about_section_content')
         .single();
 
-      if (data && data.setting_value) {
-        setAboutContent({ ...aboutContent, ...data.setting_value });
+      if (data && data.setting_value && typeof data.setting_value === 'object') {
+        const settingValue = data.setting_value as Record<string, any>;
+        setAboutContent(prev => ({
+          ...prev,
+          ...settingValue
+        }));
       }
     } catch (error) {
       console.error('Error fetching about content:', error);
@@ -94,7 +98,7 @@ const AboutSectionManagement = () => {
         .from('website_settings')
         .upsert({
           setting_key: 'about_section_content',
-          setting_value: aboutContent,
+          setting_value: aboutContent as any,
           setting_type: 'json'
         }, {
           onConflict: 'setting_key'
