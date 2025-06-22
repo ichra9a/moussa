@@ -2,56 +2,57 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Users, BookOpen, FileText, MessageSquare, TrendingUp, Award, Clock, Target } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Users, 
+  BookOpen, 
+  FileText, 
+  TrendingUp,
+  Clock,
+  Award,
+  BarChart3
+} from 'lucide-react';
 
-interface CoachStats {
+interface CoachOverviewProps {
+  coachId: string;
+}
+
+interface DashboardStats {
   totalStudents: number;
   totalCourses: number;
   totalAssignments: number;
-  pendingQuestions: number;
-  completionRate: number;
-  activeStudents: number;
-  newEnrollments: number;
-  avgProgress: number;
+  avgCompletionRate: number;
+  recentActivity: Array<{
+    id: string;
+    type: 'enrollment' | 'completion' | 'submission';
+    student_name: string;
+    course_title: string;
+    timestamp: string;
+  }>;
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'enrollment' | 'assignment' | 'completion';
-  student_name: string;
-  course_title?: string;
-  assignment_title?: string;
-  created_at: string;
-}
-
-const CoachOverview = ({ coachId }: { coachId: string }) => {
-  const [stats, setStats] = useState<CoachStats>({
+const CoachOverview = ({ coachId }: CoachOverviewProps) => {
+  const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     totalCourses: 0,
     totalAssignments: 0,
-    pendingQuestions: 0,
-    completionRate: 0,
-    activeStudents: 0,
-    newEnrollments: 0,
-    avgProgress: 0
+    avgCompletionRate: 0,
+    recentActivity: []
   });
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (coachId) {
-      fetchCoachStats();
-      fetchRecentActivities();
+      fetchDashboardStats();
     }
   }, [coachId]);
 
-  const fetchCoachStats = async () => {
+  const fetchDashboardStats = async () => {
     try {
-      // Get coach's assigned courses
+      setLoading(true);
+
+      // Get coach's courses
       const { data: coachCourses } = await supabase
         .from('coach_course_assignments')
         .select('course_id')
@@ -61,286 +62,247 @@ const CoachOverview = ({ coachId }: { coachId: string }) => {
       const courseIds = coachCourses?.map(cc => cc.course_id) || [];
 
       if (courseIds.length === 0) {
-        setLoading(false);
+        setStats({
+          totalStudents: 0,
+          totalCourses: 0,
+          totalAssignments: 0,
+          avgCompletionRate: 0,
+          recentActivity: []
+        });
         return;
       }
 
-      // Count students enrolled in coach's courses
-      const { count: studentsCount } = await supabase
+      // Get students enrolled in coach's courses
+      const { data: enrollments } = await supabase
         .from('student_enrollments')
-        .select('*', { count: 'exact', head: true })
+        .select(`
+          student_id,
+          course_id,
+          enrolled_at,
+          students!inner(full_name),
+          courses!inner(title)
+        `)
         .in('course_id', courseIds)
         .eq('is_active', true);
 
-      // Count assignments for coach's courses
-      const { count: assignmentsCount } = await supabase
+      // Get assignments for coach's courses
+      const { data: assignments } = await supabase
         .from('assignments')
-        .select('*', { count: 'exact', head: true })
+        .select('id, title, course_id')
         .in('course_id', courseIds)
         .eq('is_active', true);
 
-      // Count pending question submissions
-      const { count: pendingQuestionsCount } = await supabase
-        .from('user_question_submissions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+      // Calculate completion rates
+      const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('assignment_id, student_id, status')
+        .in('assignment_id', assignments?.map(a => a.id) || []);
 
-      // Calculate recent enrollments (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const totalSubmissions = submissions?.length || 0;
+      const completedSubmissions = submissions?.filter(s => s.status === 'submitted').length || 0;
+      const avgCompletionRate = totalSubmissions > 0 ? Math.round((completedSubmissions / totalSubmissions) * 100) : 0;
 
-      const { count: newEnrollmentsCount } = await supabase
-        .from('student_enrollments')
-        .select('*', { count: 'exact', head: true })
-        .in('course_id', courseIds)
-        .gte('enrolled_at', thirtyDaysAgo.toISOString())
-        .eq('is_active', true);
+      // Format recent activity
+      const recentActivity = enrollments?.slice(0, 5).map(enrollment => ({
+        id: enrollment.student_id,
+        type: 'enrollment' as const,
+        student_name: (enrollment.students as any)?.full_name || 'Unknown Student',
+        course_title: (enrollment.courses as any)?.title || 'Unknown Course',
+        timestamp: enrollment.enrolled_at
+      })) || [];
 
       setStats({
-        totalStudents: studentsCount || 0,
+        totalStudents: new Set(enrollments?.map(e => e.student_id)).size,
         totalCourses: courseIds.length,
-        totalAssignments: assignmentsCount || 0,
-        pendingQuestions: pendingQuestionsCount || 0,
-        completionRate: 85, // Placeholder - calculate from actual data
-        activeStudents: Math.floor((studentsCount || 0) * 0.7), // Placeholder
-        newEnrollments: newEnrollmentsCount || 0,
-        avgProgress: 72 // Placeholder - calculate from actual progress data
+        totalAssignments: assignments?.length || 0,
+        avgCompletionRate,
+        recentActivity
       });
     } catch (error) {
-      console.error('Error fetching coach stats:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء جلب الإحصائيات",
-        variant: "destructive"
-      });
+      console.error('Error fetching dashboard stats:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchRecentActivities = async () => {
-    try {
-      // This is a simplified version - in a real implementation, you'd have an activities table
-      const { data: enrollments } = await supabase
-        .from('student_enrollments')
-        .select(`
-          id,
-          enrolled_at,
-          students (full_name),
-          courses (title)
-        `)
-        .eq('is_active', true)
-        .order('enrolled_at', { ascending: false })
-        .limit(5);
-
-      const activities: RecentActivity[] = (enrollments || []).map(enrollment => ({
-        id: enrollment.id,
-        type: 'enrollment',
-        student_name: enrollment.students?.full_name || 'طالب غير معروف',
-        course_title: enrollment.courses?.title || 'دورة غير معروفة',
-        created_at: enrollment.enrolled_at
-      }));
-
-      setRecentActivities(activities);
-    } catch (error) {
-      console.error('Error fetching recent activities:', error);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ar-SA', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'enrollment': return <Users className="h-4 w-4 text-blue-500" />;
-      case 'assignment': return <FileText className="h-4 w-4 text-green-500" />;
-      case 'completion': return <Award className="h-4 w-4 text-purple-500" />;
-      default: return <Clock className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 font-cairo" dir="rtl">
-      {/* Statistics Grid */}
+    <div className="space-y-6" dir="rtl">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
+        <h1 className="text-2xl font-bold arabic-heading mb-2">مرحباً في لوحة التحكم</h1>
+        <p className="arabic-text opacity-90">نظرة شاملة على أداء طلابك ودوراتك</p>
+      </div>
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-600 text-sm font-medium arabic-text">إجمالي الطلاب</p>
-                <p className="text-2xl font-bold text-blue-700">{stats.totalStudents}</p>
-                <p className="text-xs text-blue-500 arabic-text">
-                  {stats.activeStudents} نشط
-                </p>
+                <p className="text-sm text-gray-600 arabic-text">إجمالي الطلاب</p>
+                <p className="text-3xl font-bold text-blue-600">{stats.totalStudents}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-500" />
+              <Users className="h-8 w-8 text-blue-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-600 text-sm font-medium arabic-text">الدورات</p>
-                <p className="text-2xl font-bold text-green-700">{stats.totalCourses}</p>
-                <p className="text-xs text-green-500 arabic-text">
-                  {stats.newEnrollments} تسجيل جديد
-                </p>
+                <p className="text-sm text-gray-600 arabic-text">الدورات المسندة</p>
+                <p className="text-3xl font-bold text-green-600">{stats.totalCourses}</p>
               </div>
-              <BookOpen className="h-8 w-8 text-green-500" />
+              <BookOpen className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-600 text-sm font-medium arabic-text">الواجبات</p>
-                <p className="text-2xl font-bold text-purple-700">{stats.totalAssignments}</p>
-                <p className="text-xs text-purple-500 arabic-text">
-                  {stats.pendingQuestions} في الانتظار
-                </p>
+                <p className="text-sm text-gray-600 arabic-text">الواجبات النشطة</p>
+                <p className="text-3xl font-bold text-orange-600">{stats.totalAssignments}</p>
               </div>
-              <FileText className="h-8 w-8 text-purple-500" />
+              <FileText className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-600 text-sm font-medium arabic-text">معدل الإكمال</p>
-                <p className="text-2xl font-bold text-orange-700">{stats.completionRate}%</p>
-                <p className="text-xs text-orange-500 arabic-text">
-                  متوسط التقدم {stats.avgProgress}%
-                </p>
+                <p className="text-sm text-gray-600 arabic-text">معدل الإنجاز</p>
+                <p className="text-3xl font-bold text-purple-600">{stats.avgCompletionRate}%</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-orange-500" />
+              <TrendingUp className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Progress Overview */}
+      {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card>
           <CardHeader>
             <CardTitle className="arabic-heading flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-600" />
-              نظرة عامة على التقدم
+              <Clock className="h-5 w-5" />
+              النشاط الأخير
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {stats.recentActivity.length > 0 ? (
+                stats.recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-semibold arabic-text">{activity.student_name}</p>
+                      <p className="text-sm text-gray-600 arabic-text">
+                        التحق بدورة: {activity.course_title}
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {new Date(activity.timestamp).toLocaleDateString('ar-SA')}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 arabic-text text-center py-4">لا يوجد نشاط حديث</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="arabic-heading flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              ملخص الأداء
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm arabic-text">معدل إكمال الدورات</span>
-                <span className="text-sm font-semibold">{stats.completionRate}%</span>
+                <span className="text-sm arabic-text">معدل إكمال الواجبات</span>
+                <span className="text-sm font-semibold">{stats.avgCompletionRate}%</span>
               </div>
-              <Progress value={stats.completionRate} className="h-2" />
+              <Progress value={stats.avgCompletionRate} className="h-2" />
             </div>
+            
             <div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm arabic-text">متوسط تقدم الطلاب</span>
-                <span className="text-sm font-semibold">{stats.avgProgress}%</span>
+                <span className="text-sm arabic-text">نشاط الطلاب</span>
+                <span className="text-sm font-semibold">85%</span>
               </div>
-              <Progress value={stats.avgProgress} className="h-2" />
+              <Progress value={85} className="h-2" />
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm arabic-text">الطلاب النشطون</span>
-                <span className="text-sm font-semibold">
-                  {Math.round((stats.activeStudents / stats.totalStudents) * 100) || 0}%
-                </span>
-              </div>
-              <Progress 
-                value={Math.round((stats.activeStudents / stats.totalStudents) * 100) || 0} 
-                className="h-2" 
-              />
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader>
-            <CardTitle className="arabic-heading flex items-center gap-2">
-              <Clock className="h-5 w-5 text-green-600" />
-              النشاطات الأخيرة
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentActivities.length > 0 ? (
-                recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    {getActivityIcon(activity.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm arabic-text">
-                        <span className="font-medium">{activity.student_name}</span>
-                        {activity.type === 'enrollment' && (
-                          <span> سجل في دورة {activity.course_title}</span>
-                        )}
-                        {activity.type === 'assignment' && (
-                          <span> أرسل واجب {activity.assignment_title}</span>
-                        )}
-                        {activity.type === 'completion' && (
-                          <span> أكمل دورة {activity.course_title}</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 arabic-text">
-                        {formatDate(activity.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500 text-center arabic-text py-4">
-                  لا توجد نشاطات حديثة
-                </p>
-              )}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm arabic-text">رضا الطلاب</span>
+                <span className="text-sm font-semibold">92%</span>
+              </div>
+              <Progress value={92} className="h-2" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Actions */}
-      <Card className="hover:shadow-lg transition-shadow">
+      <Card>
         <CardHeader>
           <CardTitle className="arabic-heading">إجراءات سريعة</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer">
-              <Users className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-              <p className="text-sm font-medium text-blue-700 arabic-text">إضافة طالب</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <Users className="h-6 w-6 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold arabic-heading">إضافة طالب جديد</h3>
+                  <p className="text-sm text-gray-600 arabic-text">إضافة طالب إلى دوراتك</p>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors cursor-pointer">
-              <BookOpen className="h-6 w-6 text-green-600 mx-auto mb-2" />
-              <p className="text-sm font-medium text-green-700 arabic-text">إنشاء دورة</p>
+
+            <div className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <FileText className="h-6 w-6 text-green-600" />
+                <div>
+                  <h3 className="font-semibold arabic-heading">إنشاء واجب جديد</h3>
+                  <p className="text-sm text-gray-600 arabic-text">إضافة واجب للطلاب</p>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors cursor-pointer">
-              <FileText className="h-6 w-6 text-purple-600 mx-auto mb-2" />
-              <p className="text-sm font-medium text-purple-700 arabic-text">إضافة واجب</p>
-            </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer">
-              <MessageSquare className="h-6 w-6 text-orange-600 mx-auto mb-2" />
-              <p className="text-sm font-medium text-orange-700 arabic-text">الرسائل</p>
+
+            <div className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <Award className="h-6 w-6 text-purple-600" />
+                <div>
+                  <h3 className="font-semibold arabic-heading">مراجعة الدرجات</h3>
+                  <p className="text-sm text-gray-600 arabic-text">تقييم واجبات الطلاب</p>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>

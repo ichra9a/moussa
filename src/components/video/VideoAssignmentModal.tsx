@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, CheckCircle, Clock, Award } from 'lucide-react';
+import { FileText, CheckCircle, Clock, Award, X } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -119,7 +119,7 @@ const VideoAssignmentModal = ({
           id: q.id,
           question_text: q.question_text,
           question_type: q.question_type as Question['question_type'],
-          options: Array.isArray(q.options) ? q.options : [],
+          options: Array.isArray(q.options) ? q.options.filter(opt => typeof opt === 'string') : [],
           correct_answer: q.correct_answer,
           points: q.points,
           order_index: q.order_index

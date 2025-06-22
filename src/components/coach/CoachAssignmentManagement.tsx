@@ -1,103 +1,120 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, Calendar, Users, Clock, Edit, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { FileText, Plus, Search, Edit, Trash2, Users, Clock } from 'lucide-react';
 
 interface Assignment {
   id: string;
   title: string;
-  description: string;
-  instructions: string;
-  due_date: string | null;
+  description?: string;
+  instructions?: string;
   max_score: number;
   is_active: boolean;
   created_at: string;
+  course_id?: string;
   course_title?: string;
-  submissions_count: number;
+  submission_count?: number;
+  avg_score?: number;
 }
 
-interface Course {
-  id: string;
-  title: string;
+interface CoachAssignmentManagementProps {
+  onAddAssignment: () => void;
+  onEditAssignment: (assignment: Assignment) => void;
 }
 
-const CoachAssignmentManagement = () => {
+const CoachAssignmentManagement = ({ onAddAssignment, onEditAssignment }: CoachAssignmentManagementProps) => {
+  const { coach } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newAssignment, setNewAssignment] = useState({
-    title: '',
-    description: '',
-    instructions: '',
-    course_id: '',
-    due_date: '',
-    max_score: 100
-  });
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (coach) {
+      fetchAssignments();
+    }
+  }, [coach]);
 
-  const fetchData = async () => {
+  const fetchAssignments = async () => {
+    if (!coach) return;
+
     try {
       setLoading(true);
-      
-      // Fetch assignments
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+
+      // Get coach's courses first
+      const { data: coachCourses } = await supabase
+        .from('coach_course_assignments')
+        .select('course_id')
+        .eq('coach_id', coach.id)
+        .eq('is_active', true);
+
+      const courseIds = coachCourses?.map(cc => cc.course_id) || [];
+
+      if (courseIds.length === 0) {
+        setAssignments([]);
+        return;
+      }
+
+      // Get assignments for coach's courses
+      const { data: assignmentsData } = await supabase
         .from('assignments')
         .select(`
-          *,
-          courses (
-            title
-          )
+          id,
+          title,
+          description,
+          instructions,
+          max_score,
+          is_active,
+          created_at,
+          course_id,
+          courses (title)
         `)
+        .in('course_id', courseIds)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentsData) {
+        const assignmentsWithStats = await Promise.all(
+          assignmentsData.map(async (assignment) => {
+            // Get submission count
+            const { count: submissionCount } = await supabase
+              .from('assignment_submissions')
+              .select('*', { count: 'exact', head: true })
+              .eq('assignment_id', assignment.id);
 
-      // Fetch courses for the dropdown
-      const { data: coursesData, error: coursesError } = await supabase
-        .from('courses')
-        .select('id, title')
-        .eq('is_active', true)
-        .order('title');
+            // Get average score
+            const { data: submissions } = await supabase
+              .from('assignment_submissions')
+              .select('score')
+              .eq('assignment_id', assignment.id)
+              .not('score', 'is', null);
 
-      if (coursesError) throw coursesError;
+            const avgScore = submissions && submissions.length > 0
+              ? Math.round(submissions.reduce((sum, sub) => sum + (sub.score || 0), 0) / submissions.length)
+              : 0;
 
-      // Enhanced assignments with submission counts
-      const assignmentsWithStats = await Promise.all(
-        (assignmentsData || []).map(async (assignment) => {
-          const { count: submissionsCount } = await supabase
-            .from('assignment_submissions')
-            .select('*', { count: 'exact', head: true })
-            .eq('assignment_id', assignment.id);
+            return {
+              ...assignment,
+              course_title: (assignment.courses as any)?.title,
+              submission_count: submissionCount || 0,
+              avg_score: avgScore
+            };
+          })
+        );
 
-          return {
-            ...assignment,
-            course_title: assignment.courses?.title,
-            submissions_count: submissionsCount || 0
-          };
-        })
-      );
-
-      setAssignments(assignmentsWithStats);
-      setCourses(coursesData || []);
+        setAssignments(assignmentsWithStats);
+      }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching assignments:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء جلب البيانات",
+        description: "حدث خطأ أثناء جلب الواجبات",
         variant: "destructive"
       });
     } finally {
@@ -105,253 +122,212 @@ const CoachAssignmentManagement = () => {
     }
   };
 
-  const handleCreateAssignment = async () => {
+  const handleDeleteAssignment = async (assignmentId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الواجب؟')) return;
+
     try {
-      if (!newAssignment.title || !newAssignment.course_id) {
-        toast({
-          title: "خطأ",
-          description: "يرجى ملء العنوان واختيار الدورة",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const assignmentData = {
-        title: newAssignment.title,
-        description: newAssignment.description,
-        instructions: newAssignment.instructions,
-        course_id: newAssignment.course_id,
-        due_date: newAssignment.due_date || null,
-        max_score: newAssignment.max_score,
-        is_active: true
-      };
-
       const { error } = await supabase
         .from('assignments')
-        .insert([assignmentData]);
+        .update({ is_active: false })
+        .eq('id', assignmentId);
 
       if (error) throw error;
 
       toast({
-        title: "تم بنجاح",
-        description: "تم إنشاء الواجب بنجاح"
+        title: "تم الحذف",
+        description: "تم حذف الواجب بنجاح"
       });
 
-      setShowCreateDialog(false);
-      setNewAssignment({
-        title: '',
-        description: '',
-        instructions: '',
-        course_id: '',
-        due_date: '',
-        max_score: 100
-      });
-      fetchData();
+      fetchAssignments();
     } catch (error) {
-      console.error('Error creating assignment:', error);
+      console.error('Error deleting assignment:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء إنشاء الواجب",
+        description: "حدث خطأ أثناء حذف الواجب",
         variant: "destructive"
       });
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const getStatusBadge = (assignment: Assignment) => {
-    if (!assignment.due_date) {
-      return <Badge variant="secondary" className="arabic-text">بدون موعد نهائي</Badge>;
-    }
-    
-    const dueDate = new Date(assignment.due_date);
-    const now = new Date();
-    
-    if (dueDate < now) {
-      return <Badge variant="destructive" className="arabic-text">منتهي الصلاحية</Badge>;
-    } else {
-      return <Badge variant="default" className="arabic-text">نشط</Badge>;
-    }
-  };
+  const filteredAssignments = assignments.filter(assignment =>
+    assignment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignment.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignment.course_title?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold arabic-heading">إدارة الواجبات</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="h-8 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 font-cairo" dir="rtl">
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900 arabic-heading">إدارة الواجبات</h2>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button className="arabic-text">
-              <Plus className="ml-2 h-4 w-4" />
-              إنشاء واجب جديد
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl font-cairo" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="arabic-heading">إنشاء واجب جديد</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">عنوان الواجب</label>
-                <Input
-                  value={newAssignment.title}
-                  onChange={(e) => setNewAssignment({...newAssignment, title: e.target.value})}
-                  placeholder="أدخل عنوان الواجب"
-                  className="arabic-text"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">الدورة</label>
-                <Select
-                  value={newAssignment.course_id}
-                  onValueChange={(value) => setNewAssignment({...newAssignment, course_id: value})}
-                >
-                  <SelectTrigger className="arabic-text">
-                    <SelectValue placeholder="اختر الدورة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">الوصف</label>
-                <Textarea
-                  value={newAssignment.description}
-                  onChange={(e) => setNewAssignment({...newAssignment, description: e.target.value})}
-                  placeholder="وصف الواجب"
-                  className="arabic-text"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 arabic-text">التعليمات</label>
-                <Textarea
-                  value={newAssignment.instructions}
-                  onChange={(e) => setNewAssignment({...newAssignment, instructions: e.target.value})}
-                  placeholder="تعليمات تنفيذ الواجب"
-                  className="arabic-text"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 arabic-text">تاريخ التسليم</label>
-                  <Input
-                    type="datetime-local"
-                    value={newAssignment.due_date}
-                    onChange={(e) => setNewAssignment({...newAssignment, due_date: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 arabic-text">الدرجة القصوى</label>
-                  <Input
-                    type="number"
-                    value={newAssignment.max_score}
-                    onChange={(e) => setNewAssignment({...newAssignment, max_score: parseInt(e.target.value) || 100})}
-                    className="arabic-text"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button onClick={handleCreateAssignment} className="arabic-text">
-                  إنشاء الواجب
-                </Button>
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="arabic-text">
-                  إلغاء
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <h2 className="text-2xl font-bold arabic-heading">إدارة الواجبات</h2>
+        <Button onClick={onAddAssignment} className="arabic-text">
+          <Plus className="h-4 w-4 mr-2" />
+          إضافة واجب جديد
+        </Button>
       </div>
 
-      {assignments.length > 0 ? (
-        <div className="grid gap-4">
-          {assignments.map((assignment) => (
-            <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <CardTitle className="text-lg arabic-text">{assignment.title}</CardTitle>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="arabic-text">{assignment.course_title}</span>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(assignment.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(assignment)}
-                    <Badge variant="outline" className="arabic-text">
-                      <Users className="h-3 w-3 ml-1" />
-                      {assignment.submissions_count} تسليم
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {assignment.description && (
-                  <p className="text-gray-600 arabic-text">{assignment.description}</p>
-                )}
-                
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-4">
-                    <span className="arabic-text">الدرجة القصوى: {assignment.max_score}</span>
-                    {assignment.due_date && (
-                      <div className="flex items-center gap-1 text-gray-500">
-                        <Clock className="h-4 w-4" />
-                        <span className="arabic-text">موعد التسليم: {formatDate(assignment.due_date)}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="arabic-text">
-                      <Edit className="h-4 w-4 ml-1" />
-                      تعديل
-                    </Button>
-                    <Button variant="outline" size="sm" className="arabic-text">
-                      <FileText className="h-4 w-4 ml-1" />
-                      عرض التسليمات
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Search */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="البحث في الواجبات..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pr-10 arabic-text"
+          />
         </div>
-      ) : (
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 arabic-text">إجمالي الواجبات</p>
+                <p className="text-2xl font-bold">{assignments.length}</p>
+              </div>
+              <FileText className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 arabic-text">إجمالي التسليمات</p>
+                <p className="text-2xl font-bold">
+                  {assignments.reduce((sum, assignment) => sum + (assignment.submission_count || 0), 0)}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 arabic-text">متوسط الدرجات</p>
+                <p className="text-2xl font-bold">
+                  {assignments.length > 0 
+                    ? Math.round(assignments.reduce((sum, a) => sum + (a.avg_score || 0), 0) / assignments.length)
+                    : 0}%
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Assignments Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredAssignments.map((assignment) => (
+          <Card key={assignment.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="arabic-heading text-lg">{assignment.title}</CardTitle>
+                <Badge variant={assignment.is_active ? "default" : "secondary"}>
+                  {assignment.is_active ? 'نشط' : 'غير نشط'}
+                </Badge>
+              </div>
+              {assignment.course_title && (
+                <p className="text-sm text-blue-600 arabic-text">{assignment.course_title}</p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {assignment.description && (
+                <p className="text-sm text-gray-600 arabic-text line-clamp-2">
+                  {assignment.description}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500 arabic-text">الدرجة النهائية:</span>
+                  <p className="font-semibold">{assignment.max_score}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 arabic-text">التسليمات:</span>
+                  <p className="font-semibold">{assignment.submission_count}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 arabic-text">متوسط الدرجات:</span>
+                  <p className="font-semibold">{assignment.avg_score}%</p>
+                </div>
+                <div>
+                  <span className="text-gray-500 arabic-text">تاريخ الإنشاء:</span>
+                  <p className="font-semibold">
+                    {new Date(assignment.created_at).toLocaleDateString('ar-SA')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditAssignment(assignment)}
+                  className="flex-1 arabic-text"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  تعديل
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteAssignment(assignment.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredAssignments.length === 0 && !loading && (
         <Card>
           <CardContent className="text-center py-12">
-            <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2 arabic-text">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-600 arabic-heading mb-2">
               لا توجد واجبات
             </h3>
-            <p className="text-gray-500 arabic-text">
-              ابدأ بإنشاء واجب جديد للطلاب
+            <p className="text-gray-500 arabic-text mb-4">
+              {searchTerm ? 'لم يتم العثور على واجبات تطابق البحث' : 'لم يتم إنشاء أي واجبات بعد'}
             </p>
+            {!searchTerm && (
+              <Button onClick={onAddAssignment} className="arabic-text">
+                <Plus className="h-4 w-4 mr-2" />
+                إضافة واجب جديد
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
