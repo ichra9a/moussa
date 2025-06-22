@@ -36,7 +36,7 @@ const CoachStudentManagement = () => {
       setLoading(true);
       console.log('Fetching students with enrollments...');
 
-      // Fetch students with their course enrollments
+      // Fetch students first
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select('*')
@@ -47,27 +47,50 @@ const CoachStudentManagement = () => {
       // Fetch enrollments with course details for each student
       const studentsWithEnrollments = await Promise.all(
         (studentsData || []).map(async (student) => {
-          const { data: enrollments } = await supabase
+          // First get enrollments for this student
+          const { data: enrollments, error: enrollmentsError } = await supabase
             .from('student_enrollments')
-            .select(`
-              enrolled_at,
-              courses (
-                title
-              )
-            `)
+            .select('enrolled_at, course_id')
             .eq('student_id', student.id)
             .eq('is_active', true);
 
-          // Calculate progress for each enrollment (simplified for now)
-          const enrollmentsWithProgress = (enrollments || []).map(enrollment => ({
-            course_title: enrollment.courses?.title || 'دورة غير متاحة',
-            enrolled_at: enrollment.enrolled_at,
-            progress: Math.floor(Math.random() * 100) // Placeholder - implement real progress calculation
-          }));
+          if (enrollmentsError) {
+            console.error('Error fetching enrollments:', enrollmentsError);
+            return {
+              ...student,
+              enrollments: []
+            };
+          }
+
+          // Then get course details for each enrollment
+          const enrollmentsWithCourses = await Promise.all(
+            (enrollments || []).map(async (enrollment) => {
+              const { data: course, error: courseError } = await supabase
+                .from('courses')
+                .select('title')
+                .eq('id', enrollment.course_id)
+                .single();
+
+              if (courseError) {
+                console.error('Error fetching course:', courseError);
+                return {
+                  course_title: 'دورة غير متاحة',
+                  enrolled_at: enrollment.enrolled_at,
+                  progress: 0
+                };
+              }
+
+              return {
+                course_title: course?.title || 'دورة غير متاحة',
+                enrolled_at: enrollment.enrolled_at,
+                progress: Math.floor(Math.random() * 100) // Placeholder - implement real progress calculation
+              };
+            })
+          );
 
           return {
             ...student,
-            enrollments: enrollmentsWithProgress
+            enrollments: enrollmentsWithCourses
           };
         })
       );
