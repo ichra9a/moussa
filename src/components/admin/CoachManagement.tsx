@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CoachForm from './CoachForm';
 import CoachList from './CoachList';
@@ -31,14 +31,21 @@ const CoachManagement = () => {
   const fetchCoaches = async () => {
     try {
       setLoading(true);
+      console.log('Fetching coaches...');
+      
       const { data, error } = await supabase
         .from('coaches')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching coaches:', error);
+        throw error;
+      }
+      
+      console.log('Coaches fetched successfully:', data?.length || 0);
       setCoaches(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching coaches:', error);
       toast({
         title: "خطأ",
@@ -57,18 +64,24 @@ const CoachManagement = () => {
   };
 
   const handleEditCoach = (coach: Coach) => {
+    console.log('Editing coach:', coach);
     setEditingCoach(coach);
     setShowForm(true);
   };
 
   const handleDeleteCoach = async (coachId: string) => {
     try {
+      console.log('Deleting coach with ID:', coachId);
+      
       const { error } = await supabase
         .from('coaches')
         .delete()
         .eq('id', coachId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting coach:', error);
+        throw error;
+      }
 
       toast({
         title: "تم بنجاح",
@@ -76,7 +89,7 @@ const CoachManagement = () => {
       });
 
       fetchCoaches();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting coach:', error);
       toast({
         title: "خطأ",
@@ -93,11 +106,23 @@ const CoachManagement = () => {
 
   if (showForm) {
     return (
-      <CoachForm
-        coach={editingCoach}
-        onCoachCreated={handleCoachCreated}
-        onCancel={handleCancel}
-      />
+      <div className="space-y-6 font-cairo" dir="rtl">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            className="arabic-text"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            العودة للقائمة
+          </Button>
+        </div>
+        <CoachForm
+          coach={editingCoach}
+          onCoachCreated={handleCoachCreated}
+          onCancel={handleCancel}
+        />
+      </div>
     );
   }
 
@@ -121,7 +146,7 @@ const CoachManagement = () => {
         <CardHeader>
           <CardTitle className="arabic-heading flex items-center gap-2">
             <Users className="h-5 w-5" />
-            قائمة المدربين
+            قائمة المدربين ({coaches.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
