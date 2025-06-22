@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Lock } from 'lucide-react';
@@ -10,6 +9,7 @@ import VideoProgress from './video/VideoProgress';
 import ModuleCompletion from './video/ModuleCompletion';
 import VideoVerificationQuiz from './video/VideoVerificationQuiz';
 import VideoCompletionButton from './video/VideoCompletionButton';
+import VideoAssignmentModal from './video/VideoAssignmentModal';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { useVideoCompletion } from '@/hooks/useVideoCompletion';
 import { useModuleCompletion } from '@/hooks/useModuleCompletion';
@@ -58,6 +58,9 @@ const VideoPlayer = ({
   const [watchedSufficientTime, setWatchedSufficientTime] = useState(false);
   const [ytPlayerReady, setYtPlayerReady] = useState(false);
   const [previewEnded, setPreviewEnded] = useState(false);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [hasVideoAssignment, setHasVideoAssignment] = useState(false);
+  const [assignmentCompleted, setAssignmentCompleted] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout>();
 
   const {
@@ -111,6 +114,13 @@ const VideoPlayer = ({
     };
   }, [video.youtube_id]);
 
+  // Check for video assignments
+  useEffect(() => {
+    if (student && video.id) {
+      checkVideoAssignment();
+    }
+  }, [student, video.id]);
+
   const initializePlayer = () => {
     if (containerRef.current && !isLocked) {
       playerRef.current = new window.YT.Player(containerRef.current, {
@@ -135,6 +145,38 @@ const VideoPlayer = ({
           onStateChange: onPlayerStateChange
         }
       });
+    }
+  };
+
+  const checkVideoAssignment = async () => {
+    if (!student || !video.id) return;
+
+    try {
+      // Check if video has an assignment
+      const { data: videoAssignment } = await supabase
+        .from('video_assignments')
+        .select('assignment_id')
+        .eq('video_id', video.id)
+        .eq('is_required', true)
+        .single();
+
+      if (videoAssignment) {
+        setHasVideoAssignment(true);
+
+        // Check if student has completed the assignment
+        const { data: submission } = await supabase
+          .from('assignment_submissions')
+          .select('score, status')
+          .eq('assignment_id', videoAssignment.assignment_id)
+          .eq('student_id', student.id)
+          .single();
+
+        if (submission && submission.status === 'submitted') {
+          setAssignmentCompleted(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking video assignment:', error);
     }
   };
 
@@ -163,10 +205,16 @@ const VideoPlayer = ({
       if (!maxPreviewTime) {
         setCompletionPercentage(100);
         setWatchedSufficientTime(true);
-        toast({
-          title: "اكتمل المشاهدة!",
-          description: "لقد شاهدت الفيديو كاملاً. يمكنك الآن تحديده كمكتمل",
-        });
+        
+        // Show assignment modal if video has assignment and not completed
+        if (hasVideoAssignment && !assignmentCompleted && student) {
+          setShowAssignmentModal(true);
+        } else {
+          toast({
+            title: "اكتمل المشاهدة!",
+            description: "لقد شاهدت الفيديو كاملاً. يمكنك الآن تحديده كمكتمل",
+          });
+        }
       }
     }
   };
@@ -352,6 +400,20 @@ const VideoPlayer = ({
     setPreviewEnded(false);
   };
 
+  const handleAssignmentComplete = () => {
+    setAssignmentCompleted(true);
+    setShowAssignmentModal(false);
+    
+    // Allow video completion after assignment is done
+    toast({
+      title: "تهانينا! 🎉",
+      description: "لقد أكملت الواجب بنجاح. يمكنك الآن المتابعة للفيديو التالي",
+    });
+    
+    // Mark video as completed
+    onVideoComplete(video.id);
+  };
+
   if (isLocked) {
     return (
       <Card className="opacity-60">
@@ -373,7 +435,7 @@ const VideoPlayer = ({
     );
   }
 
-  const isVideoFullyComplete = isCompleted && quizCompleted;
+  const isVideoFullyComplete = isCompleted && quizCompleted && (!hasVideoAssignment || assignmentCompleted);
 
   return (
     <div className="space-y-4">
@@ -389,6 +451,11 @@ const VideoPlayer = ({
             {maxPreviewTime && (
               <span className="text-sm bg-amber-100 text-amber-800 px-2 py-1 rounded">
                 معاينة مجانية
+              </span>
+            )}
+            {hasVideoAssignment && (
+              <span className="text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                يحتوي على واجب
               </span>
             )}
           </CardTitle>
@@ -430,7 +497,7 @@ const VideoPlayer = ({
           {/* Video Completion Button - Only show for enrolled users who watched 100% */}
           {!maxPreviewTime && (
             <VideoCompletionButton
-              watchedSufficientTime={watchedSufficientTime}
+              watchedSufficientTime={watchedSufficientTime && (!hasVideoAssignment || assignmentCompleted)}
               isCompleted={isVideoFullyComplete}
               onMarkAsComplete={handleMarkAsComplete}
             />
@@ -447,6 +514,17 @@ const VideoPlayer = ({
         <VideoVerificationQuiz
           videoId={video.id}
           onQuizComplete={handleQuizComplete}
+        />
+      )}
+
+      {/* Video Assignment Modal */}
+      {showAssignmentModal && student && (
+        <VideoAssignmentModal
+          isOpen={showAssignmentModal}
+          videoId={video.id}
+          studentId={student.id}
+          onClose={() => setShowAssignmentModal(false)}
+          onAssignmentComplete={handleAssignmentComplete}
         />
       )}
     </div>

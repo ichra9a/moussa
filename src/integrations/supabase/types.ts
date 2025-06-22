@@ -60,6 +60,53 @@ export type Database = {
         }
         Relationships: []
       }
+      assignment_questions: {
+        Row: {
+          assignment_id: string
+          correct_answer: string
+          created_at: string
+          id: string
+          options: Json
+          order_index: number
+          points: number
+          question_text: string
+          question_type: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          correct_answer: string
+          created_at?: string
+          id?: string
+          options?: Json
+          order_index?: number
+          points?: number
+          question_text: string
+          question_type?: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          correct_answer?: string
+          created_at?: string
+          id?: string
+          options?: Json
+          order_index?: number
+          points?: number
+          question_text?: string
+          question_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_assignment_questions_assignment"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignment_submissions: {
         Row: {
           assignment_id: string
@@ -213,6 +260,95 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      coach_course_assignments: {
+        Row: {
+          assigned_at: string
+          coach_id: string
+          course_id: string
+          id: string
+          is_active: boolean
+          permissions: Json
+        }
+        Insert: {
+          assigned_at?: string
+          coach_id: string
+          course_id: string
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+        }
+        Update: {
+          assigned_at?: string
+          coach_id?: string
+          course_id?: string
+          id?: string
+          is_active?: boolean
+          permissions?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_coach_course_assignments_coach"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_coach_course_assignments_course"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_permissions: {
+        Row: {
+          can_create: boolean
+          can_delete: boolean
+          can_read: boolean
+          can_update: boolean
+          coach_id: string
+          created_at: string
+          id: string
+          permission_type: string
+          resource_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_read?: boolean
+          can_update?: boolean
+          coach_id: string
+          created_at?: string
+          id?: string
+          permission_type: string
+          resource_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_read?: boolean
+          can_update?: boolean
+          coach_id?: string
+          created_at?: string
+          id?: string
+          permission_type?: string
+          resource_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_coach_permissions_coach"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       coaches: {
         Row: {
@@ -720,6 +856,58 @@ export type Database = {
           },
         ]
       }
+      student_assignment_answers: {
+        Row: {
+          answered_at: string
+          assignment_id: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+          student_id: string
+        }
+        Insert: {
+          answered_at?: string
+          assignment_id: string
+          id?: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: string
+          student_id: string
+        }
+        Update: {
+          answered_at?: string
+          assignment_id?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_answer?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_student_assignment_answers_assignment"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_student_assignment_answers_question"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "assignment_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_student_assignment_answers_student"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_enrollments: {
         Row: {
           completed_at: string | null
@@ -962,6 +1150,51 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "faq_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_assignments: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          is_required: boolean
+          trigger_at_percentage: number
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          trigger_at_percentage?: number
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          trigger_at_percentage?: number
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_video_assignments_assignment"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_video_assignments_video"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
             referencedColumns: ["id"]
           },
         ]

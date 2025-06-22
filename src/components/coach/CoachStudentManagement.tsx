@@ -1,11 +1,11 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Search, User, Mail, Calendar, BookOpen } from 'lucide-react';
+import { Search, User, Mail, Calendar, BookOpen, Plus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Student {
@@ -21,7 +21,12 @@ interface Student {
   }[];
 }
 
-const CoachStudentManagement = () => {
+interface CoachStudentManagementProps {
+  onAddStudent?: () => void;
+  onEditStudent?: (student: Student) => void;
+}
+
+const CoachStudentManagement = ({ onAddStudent, onEditStudent }: CoachStudentManagementProps) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,6 +113,33 @@ const CoachStudentManagement = () => {
     }
   };
 
+  const handleDeleteStudent = async (studentId: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
+
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', studentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف الطالب بنجاح"
+      });
+
+      fetchStudents();
+    } catch (error) {
+      console.error('Error deleting student:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حذف الطالب",
+        variant: "destructive"
+      });
+    }
+  };
+
   const filteredStudents = students.filter(student =>
     student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     student.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -133,9 +165,17 @@ const CoachStudentManagement = () => {
     <div className="space-y-6 font-cairo" dir="rtl">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900 arabic-heading">إدارة الطلاب</h2>
-        <Badge variant="outline" className="arabic-text">
-          {filteredStudents.length} طالب
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="arabic-text">
+            {filteredStudents.length} طالب
+          </Badge>
+          {onAddStudent && (
+            <Button onClick={onAddStudent} className="arabic-text">
+              <Plus className="h-4 w-4 mr-2" />
+              إضافة طالب
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="relative">
@@ -157,9 +197,29 @@ const CoachStudentManagement = () => {
                   <User className="h-5 w-5 text-blue-600" />
                   <CardTitle className="text-lg arabic-text">{student.full_name}</CardTitle>
                 </div>
-                <Badge className="arabic-text">
-                  {student.enrollments.length} دورة
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="arabic-text">
+                    {student.enrollments.length} دورة
+                  </Badge>
+                  {onEditStudent && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEditStudent(student)}
+                      className="arabic-text"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteStudent(student.id)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

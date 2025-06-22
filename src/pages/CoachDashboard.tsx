@@ -8,96 +8,131 @@ import CoachStudentManagement from '@/components/coach/CoachStudentManagement';
 import CoachCourseManagement from '@/components/coach/CoachCourseManagement';
 import CoachAssignmentManagement from '@/components/coach/CoachAssignmentManagement';
 import CoachQuestionManagement from '@/components/coach/CoachQuestionManagement';
-import StatsCards from '@/components/dashboard/StatsCards';
+import CoachOverview from '@/components/coach/enhanced/CoachOverview';
+import CoachStudentForm from '@/components/coach/forms/CoachStudentForm';
+import CoachCourseForm from '@/components/coach/forms/CoachCourseForm';
+import AssignmentQuizForm from '@/components/coach/forms/AssignmentQuizForm';
 
 const CoachDashboard = () => {
   const { coach, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalCourses: 0,
-    totalAssignments: 0,
-    pendingQuestions: 0
-  });
+  const [activeForm, setActiveForm] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (coach) {
-      fetchStats();
-    }
-  }, [coach]);
-
-  const fetchStats = async () => {
-    try {
-      // Count total students (simplified - in real implementation, filter by coach assignments)
-      const { count: studentsCount } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true });
-
-      // Count total courses
-      const { count: coursesCount } = await supabase
-        .from('courses')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-      // Count assignments
-      const { count: assignmentsCount } = await supabase
-        .from('assignments')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-      // Count pending questions
-      const { count: pendingQuestionsCount } = await supabase
-        .from('user_question_submissions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      setStats({
-        totalStudents: studentsCount || 0,
-        totalCourses: coursesCount || 0,
-        totalAssignments: assignmentsCount || 0,
-        pendingQuestions: pendingQuestionsCount || 0
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
       setLoading(false);
     }
-  };
+  }, [coach]);
 
   const handleLogout = async () => {
     await signOut();
     navigate('/');
   };
 
+  const handleFormClose = () => {
+    setActiveForm(null);
+    setEditingItem(null);
+  };
+
+  const handleFormSave = () => {
+    setActiveForm(null);
+    setEditingItem(null);
+    // Refresh the current tab content
+    setActiveTab(activeTab);
+  };
+
+  const handleAddStudent = () => {
+    setEditingItem(null);
+    setActiveForm('student');
+  };
+
+  const handleEditStudent = (student: any) => {
+    setEditingItem(student);
+    setActiveForm('student');
+  };
+
+  const handleAddCourse = () => {
+    setEditingItem(null);
+    setActiveForm('course');
+  };
+
+  const handleEditCourse = (course: any) => {
+    setEditingItem(course);
+    setActiveForm('course');
+  };
+
+  const handleAddAssignment = () => {
+    setEditingItem(null);
+    setActiveForm('assignment');
+  };
+
+  const handleEditAssignment = (assignment: any) => {
+    setEditingItem(assignment);
+    setActiveForm('assignment');
+  };
+
   const renderContent = () => {
+    if (activeForm) {
+      switch (activeForm) {
+        case 'student':
+          return (
+            <CoachStudentForm
+              student={editingItem}
+              coachId={coach?.id || ''}
+              onStudentSaved={handleFormSave}
+              onCancel={handleFormClose}
+            />
+          );
+        case 'course':
+          return (
+            <CoachCourseForm
+              course={editingItem}
+              coachId={coach?.id || ''}
+              onCourseSaved={handleFormSave}
+              onCancel={handleFormClose}
+            />
+          );
+        case 'assignment':
+          return (
+            <AssignmentQuizForm
+              assignment={editingItem}
+              courseId={editingItem?.course_id || ''}
+              onAssignmentSaved={handleFormSave}
+              onCancel={handleFormClose}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+
     switch (activeTab) {
       case 'overview':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-slate-900 arabic-heading mb-2">
-                مرحباً {coach?.full_name}
-              </h2>
-              <p className="text-slate-600 arabic-text text-lg">
-                نظرة عامة على أنشطتك التدريبية
-              </p>
-            </div>
-            <StatsCards
-              totalStudents={stats.totalStudents}
-              totalCourses={stats.totalCourses}
-              completedModules={stats.totalAssignments}
-              averageProgress={stats.pendingQuestions}
-            />
-          </div>
-        );
+        return <CoachOverview coachId={coach?.id || ''} />;
       case 'students':
-        return <CoachStudentManagement />;
+        return (
+          <CoachStudentManagement
+            onAddStudent={handleAddStudent}
+            onEditStudent={handleEditStudent}
+          />
+        );
       case 'courses':
-        return <CoachCourseManagement />;
+        return (
+          <CoachCourseManagement
+            onAddCourse={handleAddCourse}
+            onEditCourse={handleEditCourse}
+          />
+        );
       case 'assignments':
-        return <CoachAssignmentManagement />;
+        return (
+          <CoachAssignmentManagement
+            onAddAssignment={handleAddAssignment}
+            onEditAssignment={handleEditAssignment}
+          />
+        );
       case 'questions':
         return <CoachQuestionManagement />;
       default:
