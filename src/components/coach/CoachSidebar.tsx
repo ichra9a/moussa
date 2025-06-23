@@ -7,6 +7,7 @@ import {
   FileText, 
   MessageSquare, 
   BarChart3,
+  Video,
   LogOut 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ const CoachSidebar = ({ activeTab, onTabChange, onLogout, coachName }: CoachSide
     { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
     { id: 'students', label: 'الطلاب', icon: Users },
     { id: 'courses', label: 'الدورات', icon: BookOpen },
+    { id: 'videos', label: 'الفيديوهات', icon: Video },
     { id: 'assignments', label: 'الواجبات', icon: FileText },
     { id: 'questions', label: 'الأسئلة', icon: MessageSquare },
   ];
@@ -45,8 +47,8 @@ const CoachSidebar = ({ activeTab, onTabChange, onLogout, coachName }: CoachSide
                 <Button
                   variant={activeTab === item.id ? "default" : "ghost"}
                   className={cn(
-                    "w-full justify-start arabic-text",
-                    activeTab === item.id && "bg-blue-50 text-blue-700 border-blue-200"
+                    "w-full justify-start arabic-text transition-all duration-200",
+                    activeTab === item.id && "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
                   )}
                   onClick={() => onTabChange(item.id)}
                 >

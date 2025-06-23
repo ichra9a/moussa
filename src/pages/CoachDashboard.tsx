@@ -6,11 +6,13 @@ import { useNavigate } from 'react-router-dom';
 import CoachSidebar from '@/components/coach/CoachSidebar';
 import CoachStudentManagement from '@/components/coach/CoachStudentManagement';
 import CoachCourseManagement from '@/components/coach/CoachCourseManagement';
+import CoachVideoManagement from '@/components/coach/CoachVideoManagement';
 import CoachAssignmentManagement from '@/components/coach/CoachAssignmentManagement';
 import CoachQuestionManagement from '@/components/coach/CoachQuestionManagement';
 import CoachOverview from '@/components/coach/enhanced/CoachOverview';
 import CoachStudentForm from '@/components/coach/forms/CoachStudentForm';
 import CoachCourseForm from '@/components/coach/forms/CoachCourseForm';
+import CoachVideoForm from '@/components/coach/forms/CoachVideoForm';
 import AssignmentQuizForm from '@/components/coach/forms/AssignmentQuizForm';
 
 const CoachDashboard = () => {
@@ -64,6 +66,16 @@ const CoachDashboard = () => {
     setActiveForm('course');
   };
 
+  const handleAddVideo = () => {
+    setEditingItem(null);
+    setActiveForm('video');
+  };
+
+  const handleEditVideo = (video: any) => {
+    setEditingItem(video);
+    setActiveForm('video');
+  };
+
   const handleAddAssignment = () => {
     setEditingItem(null);
     setActiveForm('assignment');
@@ -92,6 +104,15 @@ const CoachDashboard = () => {
               course={editingItem}
               coachId={coach?.id || ''}
               onCourseSaved={handleFormSave}
+              onCancel={handleFormClose}
+            />
+          );
+        case 'video':
+          return (
+            <CoachVideoForm
+              video={editingItem}
+              coachId={coach?.id || ''}
+              onVideoSaved={handleFormSave}
               onCancel={handleFormClose}
             />
           );
@@ -124,6 +145,13 @@ const CoachDashboard = () => {
           <CoachCourseManagement
             onAddCourse={handleAddCourse}
             onEditCourse={handleEditCourse}
+          />
+        );
+      case 'videos':
+        return (
+          <CoachVideoManagement
+            onAddVideo={handleAddVideo}
+            onEditVideo={handleEditVideo}
           />
         );
       case 'assignments':

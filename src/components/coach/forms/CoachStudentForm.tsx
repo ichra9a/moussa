@@ -6,11 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, BookOpen, Save, X } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Save, X, UserPlus } from 'lucide-react';
 
 interface Student {
   id?: string;
@@ -62,7 +60,10 @@ const CoachStudentForm = ({ student, coachId, onStudentSaved, onCancel }: CoachS
     try {
       const { data: coachCourses } = await supabase
         .from('coach_course_assignments')
-        .select('course_id, courses(id, title)')
+        .select(`
+          course_id,
+          courses (id, title)
+        `)
         .eq('coach_id', coachId)
         .eq('is_active', true);
 
@@ -157,11 +158,20 @@ const CoachStudentForm = ({ student, coachId, onStudentSaved, onCancel }: CoachS
 
       // Update course enrollments
       if (studentId) {
-        // Remove old enrollments
-        await supabase
+        // Remove old enrollments for coach's courses only
+        const { data: existingEnrollments } = await supabase
           .from('student_enrollments')
-          .delete()
-          .eq('student_id', studentId);
+          .select('course_id')
+          .eq('student_id', studentId)
+          .in('course_id', availableCourses.map(c => c.id));
+
+        if (existingEnrollments && existingEnrollments.length > 0) {
+          await supabase
+            .from('student_enrollments')
+            .delete()
+            .eq('student_id', studentId)
+            .in('course_id', existingEnrollments.map(e => e.course_id));
+        }
 
         // Add new enrollments
         if (selectedCourses.length > 0) {
@@ -180,7 +190,7 @@ const CoachStudentForm = ({ student, coachId, onStudentSaved, onCancel }: CoachS
 
       toast({
         title: "تم بنجاح",
-        description: student?.id ? "تم تحديث الطالب بنجاح" : "تم إنشاء الطالب بنجاح"
+        description: student?.id ? "تم تحديث الطالب وتسجيله في الدورات بنجاح" : "تم إنشاء الطالب وتسجيله في الدورات بنجاح"
       });
 
       onStudentSaved();
@@ -197,132 +207,149 @@ const CoachStudentForm = ({ student, coachId, onStudentSaved, onCancel }: CoachS
   };
 
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="arabic-heading flex items-center gap-2">
-          <User className="h-5 w-5" />
-          {student?.id ? 'تعديل الطالب' : 'إضافة طالب جديد'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold arabic-heading">المعلومات الأساسية</h3>
-            
-            <div>
-              <Label htmlFor="full_name" className="arabic-text">الاسم الكامل</Label>
-              <Input
-                id="full_name"
-                value={formData.full_name}
-                onChange={(e) => handleInputChange('full_name', e.target.value)}
-                placeholder="أدخل الاسم الكامل"
-                className="arabic-text"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="email" className="arabic-text">البريد الإلكتروني</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="أدخل البريد الإلكتروني"
-                className="arabic-text"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone" className="arabic-text">رقم الهاتف</Label>
-              <Input
-                id="phone"
-                value={formData.phone || ''}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="أدخل رقم الهاتف (اختياري)"
-                className="arabic-text"
-              />
-            </div>
-
-            {student?.pin_code && (
-              <div>
-                <Label className="arabic-text">رمز PIN</Label>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    {student.pin_code}
-                  </Badge>
-                  <span className="text-sm text-gray-500 arabic-text">
-                    (يستخدم للدخول إلى النظام)
-                  </span>
+    <div className="max-w-4xl mx-auto" dir="rtl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="arabic-heading flex items-center gap-2">
+            <UserPlus className="h-5 w-5" />
+            {student?.id ? 'تعديل الطالب وتعديل الدورات' : 'إضافة طالب جديد وتسجيله في الدورات'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold arabic-heading border-b pb-2">المعلومات الأساسية</h3>
+                
+                <div>
+                  <Label htmlFor="full_name" className="arabic-text">الاسم الكامل</Label>
+                  <Input
+                    id="full_name"
+                    value={formData.full_name}
+                    onChange={(e) => handleInputChange('full_name', e.target.value)}
+                    placeholder="أدخل الاسم الكامل"
+                    className="arabic-text"
+                    required
+                  />
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Course Enrollments */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold arabic-heading flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              الدورات المسجل بها
-            </h3>
-            
-            {loadingCourses ? (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              </div>
-            ) : availableCourses.length > 0 ? (
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {availableCourses.map((course) => (
-                  <div key={course.id} className="flex items-center space-x-2 space-x-reverse">
-                    <Checkbox
-                      id={`course-${course.id}`}
-                      checked={selectedCourses.includes(course.id)}
-                      onCheckedChange={(checked) => 
-                        handleCourseToggle(course.id, checked as boolean)
-                      }
-                    />
-                    <Label htmlFor={`course-${course.id}`} className="arabic-text flex-1">
-                      {course.title}
-                    </Label>
+                <div>
+                  <Label htmlFor="email" className="arabic-text">البريد الإلكتروني</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="أدخل البريد الإلكتروني"
+                    className="arabic-text"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="phone" className="arabic-text">رقم الهاتف</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone || ''}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="أدخل رقم الهاتف (اختياري)"
+                    className="arabic-text"
+                  />
+                </div>
+
+                {student?.pin_code && (
+                  <div>
+                    <Label className="arabic-text">رمز PIN</Label>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-lg px-3 py-1">
+                        {student.pin_code}
+                      </Badge>
+                      <span className="text-sm text-gray-500 arabic-text">
+                        (يستخدم للدخول إلى النظام)
+                      </span>
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
-            ) : (
-              <p className="text-gray-500 arabic-text text-center py-4">
-                لا توجد دورات متاحة
-              </p>
-            )}
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1 arabic-text"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              {student?.id ? 'تحديث الطالب' : 'إنشاء الطالب'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              className="arabic-text"
-            >
-              <X className="h-4 w-4 mr-2" />
-              إلغاء
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+              {/* Course Assignments */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold arabic-heading flex items-center gap-2 border-b pb-2">
+                  <BookOpen className="h-5 w-5" />
+                  تسجيل الطالب في الدورات
+                </h3>
+                
+                {loadingCourses ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : availableCourses.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    <div className="text-sm text-gray-600 arabic-text mb-3">
+                      اختر الدورات التي تريد تسجيل الطالب بها:
+                    </div>
+                    {availableCourses.map((course) => (
+                      <div key={course.id} className="flex items-center space-x-3 space-x-reverse p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <Checkbox
+                          id={`course-${course.id}`}
+                          checked={selectedCourses.includes(course.id)}
+                          onCheckedChange={(checked) => 
+                            handleCourseToggle(course.id, checked as boolean)
+                          }
+                        />
+                        <Label htmlFor={`course-${course.id}`} className="arabic-text flex-1 cursor-pointer">
+                          {course.title}
+                        </Label>
+                      </div>
+                    ))}
+                    {selectedCourses.length > 0 && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-700 arabic-text">
+                          سيتم تسجيل الطالب في {selectedCourses.length} دورة
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 arabic-text">
+                      لا توجد دورات متاحة للتسجيل
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-6 border-t">
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex-1 arabic-text"
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {student?.id ? 'تحديث الطالب والدورات' : 'إنشاء الطالب وتسجيله'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                className="arabic-text"
+              >
+                <X className="h-4 w-4 mr-2" />
+                إلغاء
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
